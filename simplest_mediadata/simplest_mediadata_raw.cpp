@@ -1314,6 +1314,253 @@ static int simplest_h264_parser(const char *url)
 	return 0;
 }
 
+//////////////////////AAC音频码流解析/////////////////////////////////////////////////////
+
+/*
+ * AAC音频格式分析
+ * AAC音频格式有ADIF和ADTS：
+ *
+ * ADIF：Audio Data Interchange Format 音频数据交换格式。这种格式的特征是可以确定的找到这个音频数据的开始，不需进行在音频数据流中间开始的解码
+ *       即它的解码必须在明确定义的开始处进行。故这种格式常用在磁盘文件中
+ *
+ * ADTS：Audio Data Transport Stream 音频数据传输流。这种格式的特征是它是一个有同步字的比特流，解码可以在这个流中任何位置开始。它的特征类似于mp3数据流格式
+ *       简单说，ADTS可以在任意帧解码，也就是说它每一帧都有头信息。ADIF只有一个统一的头，所以必须得到所有的数据后解码。且这两种的header的格式也是不同的，
+ *       目前一般编码后的和抽取出的都是ADTS格式的音频流。
+ *
+ * 语音系统对实时性要求较高，基本是这样一个流程，采集音频数据，本地编码，数据上传，服务器处理，数据下发，本地解码
+ *
+ * ADTS是帧序列，本身具备流特征，在音频流的传输与处理方面更加合适。
+ *
+ * ADTS帧结构：
+ *      header
+ *      body
+ *
+ *ADTS的头信息都是7个字节，ADTS帧首部结构：
+ *   序号	域	                         长度（bits）	           说明
+ *   1	  Syncword	                      12	               同步头 总是0xFFF, all bits must be 1，代表着一个ADTS帧的开始
+ *   2	MPEG version	                  1	                   0 for MPEG-4, 1 for MPEG-2
+ *   3	Layer	                          2	                   always 0
+ *   4	Protection Absent	              1	                   et to 1 if there is no CRC and 0 if there is CRC
+ *   5	Profile	                          2	                   the MPEG-4 Audio Object Type minus 1
+ *   6	MPEG-4 Sampling Frequency Index	  4	                   MPEG-4 Sampling Frequency Index (15 is forbidden)
+ *   7	Private Stream	                  1	                   set to 0 when encoding, ignore when decoding
+ *   8	MPEG-4 Channel Configuration	  3	                   MPEG-4 Channel Configuration (in the case of 0, the channel configuration is sent via an inband PCE)
+ *   9	Originality	                      1	                   set to 0 when encoding, ignore when decoding
+ *   10	Home	                          1	                   set to 0 when encoding, ignore when decoding
+ *   11	Copyrighted Stream	              1	                   set to 0 when encoding, ignore when decoding
+ *   12	Copyrighted Start	              1	                   set to 0 when encoding, ignore when decoding
+ *   13	Frame Length	                 13	                   this value must include 7 or 9 bytes of header length: FrameLength = (ProtectionAbsent == 1 ? 7 : 9) + size(AACFrame)
+ *   14	Buffer Fullness	                 11	                   buffer fullness
+ *   15	Number of AAC Frames	         2	                   number of AAC frames (RDBs) in ADTS frame minus 1, for maximum compatibility always use 1 AAC frame per ADTS frame
+ *
+*/
+static int getADTSframe(unsigned char* buffer, int buf_size, unsigned char* data ,int* data_size)
+{
+	int size = 0;
+
+	if(!buffer || !data || !data_size)
+	{
+		return -1;
+	}
+
+	while(1)
+	{
+		if(buf_size < 7) //读取的acc原始碼流字节数不能小于ADTS头
+		{
+			return -1;
+		}
+
+		//Sync words
+		if((buffer[0] == 0xff) && ((buffer[1] & 0xf0) == 0xf0))
+		{
+			//找到ADTS帧后，根据ADTS帧头部结构提取Frame Length字段
+			size |= ((buffer[3] & 0x03) <<11);     //high 2 bit
+			size |= buffer[4]<<3;                  //middle 8 bit
+			size |= ((buffer[5] & 0xe0)>>5);       //low 3bit
+			break;
+		}
+
+		--buf_size;
+		++buffer;
+	}
+
+	//读取的AAC碼流字节数如果小于一帧ADTS长度，则需要接着继续读取后面的数据，保证解析AAC碼流至少包含一个ADTS帧
+	if(buf_size < size)
+	{
+		return 1;
+	}
+
+	memcpy(data,buffer,size);
+	*data_size = size;
+
+	return 0;
+}
+
+/*
+ * AAC码流解析的步骤就是首先从码流中搜索0x0FFF，分离出ADTS frame；然后再分析ADTS frame的首部各个字段
+ * 本文的程序即实现了上述的两个步骤
+ */
+static int simplest_aac_parser(const char *url)
+{
+	int data_size = 0;
+	int size = 0;
+	int cnt = 0;
+	int offset = 0;
+
+	//FILE *myout = fopen("output_log.txt","w+");
+	FILE *myout = stdout;
+
+	unsigned char *aacframe = (unsigned char *)malloc(1024*5);
+	unsigned char *aacbuffer = (unsigned char *)malloc(1024*1024);
+
+	FILE *ifile = fopen(url, "r");
+	if(!ifile)
+	{
+		printf("%s: Open file error",__FUNCTION__);
+		return -1;
+	}
+
+	printf("-----+----------- ADTS Frame Table ----------+-------------+\n");
+	printf(" NUM | Profile | Frequency | Channel Configurations | Size |\n");
+	printf("-----+---------+-----------+------------------------+------+\n");
+
+	while(!feof(ifile))
+	{
+		data_size = fread(aacbuffer+offset,1,1024*1024-offset,ifile);
+		unsigned char* input_data = aacbuffer;
+
+		while(1)
+		{
+			int ret = getADTSframe(input_data,data_size,aacframe,&size);
+
+			if(ret == -1)
+			{
+				break;
+			}
+			else if(ret == 1)
+			{
+				memcpy(aacbuffer,input_data,data_size);
+				offset = data_size;
+				break;
+			}
+
+			char profile_str[10] = {0};
+			char frequence_str[10] = {0};
+			char channel_config_str[100] = {0};
+
+			//aacframe保存了一帧ADTS
+			unsigned char profile = aacframe[2] & 0xC0;
+			profile = profile >> 6;
+
+			switch(profile)
+			{
+				case 0:
+					sprintf(profile_str,"Main");
+					break;
+				case 1:
+					sprintf(profile_str,"LC");
+					break;
+				case 2:
+					sprintf(profile_str,"SSR");
+					break;
+				default:
+					sprintf(profile_str,"unknown");
+					break;
+			}
+
+			unsigned char sampling_frequency_index = aacframe[2] & 0x3C;
+			sampling_frequency_index = sampling_frequency_index >> 2;
+
+			switch(sampling_frequency_index)
+			{
+				case 0:
+					sprintf(frequence_str,"96000Hz");
+					break;
+				case 1:
+					sprintf(frequence_str,"88200Hz");
+					break;
+				case 2:
+					sprintf(frequence_str,"64000Hz");
+					break;
+				case 3:
+					sprintf(frequence_str,"48000Hz");
+					break;
+				case 4:
+					sprintf(frequence_str,"44100Hz");
+					break;
+				case 5:
+					sprintf(frequence_str,"32000Hz");
+					break;
+				case 6:
+					sprintf(frequence_str,"24000Hz");
+					break;
+				case 7:
+					sprintf(frequence_str,"22050Hz");
+					break;
+				case 8:
+					sprintf(frequence_str,"16000Hz");
+					break;
+				case 9:
+					sprintf(frequence_str,"12000Hz");
+					break;
+				case 10:
+					sprintf(frequence_str,"11025Hz");
+					break;
+				case 11:
+					sprintf(frequence_str,"8000Hz");
+					break;
+				case 12:
+					sprintf(frequence_str,"7350Hz");
+					break;
+				default:
+					sprintf(frequence_str,"unknown");
+					break;
+			}
+
+			unsigned char channel_config_index = aacframe[2] & 0x01 << 2;
+			channel_config_index = channel_config_index | ((aacframe[3] & 0xC0) >> 6);
+            switch(channel_config_index)
+			{
+				case 0:
+					sprintf(channel_config_str,"Defined in AOT Specifc Config");
+					break;
+				case 1:
+					 sprintf(channel_config_str,"1 channel");
+					 break;
+				case 2:
+					  sprintf(channel_config_str,"2 channels");
+					  break;
+				case 3:
+					  sprintf(channel_config_str,"3 channels");
+					  break;
+				case 4:
+					  sprintf(channel_config_str,"4 channels");
+					  break;
+				case 5:
+					  sprintf(channel_config_str,"5 channels");
+					  break;
+				case 6:
+					  sprintf(channel_config_str,"6 channels");
+					  break;
+				case 7:
+					  sprintf(channel_config_str,"8 channels");
+					  break;
+			}
+
+			fprintf(myout,"%5d| %8s|  %8s|  %8s| %5d|\n",cnt,profile_str ,frequence_str,channel_config_str,size);
+			data_size -= size;
+			input_data += size;
+			cnt++;
+		}
+	}
+
+	fclose(ifile);
+	free(aacbuffer);
+	free(aacframe);
+
+	return 0;
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -1337,6 +1584,8 @@ int main(int argc, char* argv[])
     simplest_pcm16le_to_wave("pcm/NocturneNo2inEflat_44.1k_s16le.pcm",2,44100,"pcm/output_nocturne.wav");
 
 	simplest_h264_parser("h264/sintel.h264");
+
+	simplest_aac_parser("aac/nocturne.aac");
 
 	return 0;
 }
