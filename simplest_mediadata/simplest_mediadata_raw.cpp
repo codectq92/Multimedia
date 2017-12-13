@@ -1561,31 +1561,536 @@ static int simplest_aac_parser(const char *url)
 	return 0;
 }
 
+////////////////////////////FLV封装格式解析///////////////////////////////////////////////////
+
+/*
+ * FLV封装格式是由一个FLV Header文件头和一个一个的Tag组成的。Tag中包含了音频数据以及视频数据。FLV的结构如下所示
+ *  FLV Header
+ *  TAG(OnMetaData)
+ *  Tag(vedio) [H.264]
+ *  Tag(vedio) [H.264]
+ *  Tag(audio) [AAC]
+ *  Tag(vedio) [H.264]
+ *  ...
+ *  FLV Header部分记录了flv的类型、版本等信息，是flv的开头,占9bytes。
+ *  其中每个Tag前面还包含了Previous Tag Size字段，4字节，表示前面一个Tag的大小。Tag的类型可以是视频、音频和Script，
+ *  每个Tag只能包含以上三种类型的数据中的一种，每个Tag由也是由两部分组成的：Tag Header和Tag Data。
+ *  Tag Header里存放的是当前Tag的类型、数据区（Tag Data）长度等信息
+ */
+#define TAG_TYPE_SCRIPT 18
+#define TAG_TYPE_AUDIO  8
+#define TAG_TYPE_VIDEO  9
+
+typedef unsigned char byte;
+typedef unsigned int  uint;
+
+//FLV Header结构定义
+typedef struct{
+	byte Signature[3];        //3 bytes	,为"FLV"
+	byte Version;             //1 byte,一般为0x01
+	byte Flags;               //1 byte ,倒数第一位是1表示有视频，倒数第三位是1表示有音频，其它位必须为0
+	uint DataOffset;          //4 bytes	,整个header的长度，一般为9,大于9表示下面还有扩展信息
+}FLV_HEADER;
+
+//Tag Header结构定义
+typedef struct{
+	byte TagType;            //Tag类型,1 bytes,8：音频 9：视频  18：脚本 其他：保留
+	byte DataSize[3];        //数据区长度,3 bytes ,表示该Tag Data部分的大小
+	byte Timestamp[3];       //时间戳,3 bytes ,整数，单位是毫秒。对于脚本型的tag总是0
+	uint Reserved;           //代表1 bytes时间戳扩展和3 bytes StreamsID。时间戳扩展将时间戳扩展为4bytes，代表高8位，很少用到。StreamsID总是0
+}TAG_HEADER;
+
+//reverse_bytes - turn a BigEndian byte array into a LittleEndian integer
+static uint reverse_bytes(byte *p, char c)
+{
+	int r = 0;
+	int i;
+	for(i=0; i<c; i++)
+		r |= ( *(p+i) << (((c-1)*8)-8*i));
+	return r;
+}
+
+/**
+* Analysis FLV file
+* @param url Location of input FLV file.
+*/
+static int simplest_flv_parser(const char *url)
+{
+	//whether output audio/video stream
+	int output_a = 1; //控制开关，1 输出音频流  0 不输出音频流
+	int output_v = 1; //控制开关，1 输出视频流  0 不输出视频流
+
+	FILE *ifh = NULL,*vfh = NULL, *afh = NULL;
+
+	//FILE *myout = fopen("output_log.txt","w+");
+    FILE *myout = stdout;
+
+	FLV_HEADER flv;
+	TAG_HEADER tagheader;
+	uint previoustagsize, previoustagsize_z = 0 ,previousVedioTagsize = 0;
+
+	ifh = fopen(url, "r+");
+	if(ifh == NULL)
+	{
+		printf("%s: Failed to open files!",__FUNCTION__);
+		return -1;
+	}
+
+	//FLV file header
+    fread((char *)&flv,1,sizeof(FLV_HEADER),ifh);
+
+	fprintf(myout,"============== FLV Header ==============\n");
+	fprintf(myout,"Signature:  0x %c %c %c\n",flv.Signature[0],flv.Signature[1],flv.Signature[2]);
+	fprintf(myout,"Version:    0x %X\n",flv.Version);
+	fprintf(myout,"Flags  :    0x %X\n",flv.Flags);
+	fprintf(myout,"HeaderSize: 0x %X\n",flv.DataOffset);
+	fprintf(myout,"========================================\n");
+
+    //move the file pointer to the end of the header
+    fseek(ifh, flv.DataOffset, SEEK_SET);
+
+	//process each tag
+	do{
+		//读取4字节整数Previous Tag Size
+		int tmp;
+		fread((char *)&tmp,1,4,ifh);
+		previoustagsize = reverse_bytes((byte *)&tmp, sizeof(tmp));
+		//读取Tag Header
+		fread((void *)&tagheader,sizeof(TAG_HEADER),1,ifh);
+
+        int tagheader_datasize = tagheader.DataSize[0]*65536 + tagheader.DataSize[1]*256 + tagheader.DataSize[2];
+		int tagheader_timestamp = tagheader.Timestamp[0]*65536 + tagheader.Timestamp[1]*256 + tagheader.Timestamp[2];
+
+//		fprintf(myout,"previoustagsize: %d, TagType: %d, tagheader_datasize: %d, tagheader_timestamp :%d\n",previoustagsize,tagheader.TagType,tagheader_datasize,tagheader_timestamp);
+		//由于读取Tag头时需要读取sizeof(TAG_HEADER)个字节,故需要将文件指针重新定位到Tag头末尾
+		fseek(ifh, 11-sizeof(TAG_HEADER), SEEK_CUR);
+
+		char tagtype_str[10];
+		switch(tagheader.TagType)
+		{
+			case TAG_TYPE_AUDIO:
+				sprintf(tagtype_str,"AUDIO");
+				break;
+			case TAG_TYPE_VIDEO:
+				sprintf(tagtype_str,"VIDEO");
+				break;
+			case TAG_TYPE_SCRIPT:
+				sprintf(tagtype_str,"SCRIPT");
+				break;
+			default:
+				sprintf(tagtype_str,"UNKNOWN");
+				break;
+		}
+
+		fprintf(myout,"[%6s] %6d %6d |",tagtype_str,tagheader_datasize,tagheader_timestamp);
+
+		//if we are not past the end of file, process the tag
+        if(feof(ifh))
+			break;
+
+		//process tag by type
+		switch(tagheader.TagType)
+		{
+			case TAG_TYPE_AUDIO:
+            {
+				char audiotag_str[100] = {0};
+				strcat(audiotag_str,"| ");
+				char tagdata_first_byte;
+				tagdata_first_byte = fgetc(ifh);  //提取音频参数信息
+				int x = tagdata_first_byte & 0xF0;
+				x = x >> 4;  //音频编码类型
+				switch(x)
+				{
+					case 0:
+						strcat(audiotag_str,"Linear PCM, platform endian");
+						break;
+					case 1:
+						strcat(audiotag_str,"ADPCM");
+						break;
+					case 2:
+						strcat(audiotag_str,"MP3");
+						break;
+					case 3:
+						strcat(audiotag_str,"Linear PCM, little endian");
+						break;
+					case 4:
+						strcat(audiotag_str,"Nellymoser 16-kHz mono");
+						break;
+					case 5:
+						strcat(audiotag_str,"Nellymoser 8-kHz mono");
+						break;
+					case 6:
+						strcat(audiotag_str,"Nellymoser");
+						break;
+					case 7:
+						strcat(audiotag_str,"G.711 A-law logarithmic PCM");
+						break;
+					case 8:
+						strcat(audiotag_str,"G.711 mu-law logarithmic PCM");
+						break;
+					case 9:
+						strcat(audiotag_str,"reserved");
+						break;
+					case 10:
+						strcat(audiotag_str,"AAC");
+						break;
+					case 11:
+						strcat(audiotag_str,"Speex");
+						break;
+					case 14:
+						strcat(audiotag_str,"MP3 8-Khz");
+						break;
+					case 15:
+						strcat(audiotag_str,"Device-specific sound");
+						break;
+					default:
+						strcat(audiotag_str,"UNKNOWN");
+						break;
+				}
+
+				strcat(audiotag_str,"| ");
+				x = tagdata_first_byte & 0x0C;  //音频采样率,FLV封装格式并不支持48KHz的采样率
+				x = x >> 2;
+				switch(x)
+				{
+					case 0:
+						strcat(audiotag_str,"5.5-kHz");
+						break;
+					case 1:
+						strcat(audiotag_str,"11-kHz");
+						break;
+					case 2:
+						strcat(audiotag_str,"22-kHz");
+						break;
+					case 3:
+						strcat(audiotag_str,"44-kHz");
+						break;
+					default:
+						strcat(audiotag_str,"UNKNOWN");
+						break;
+				}
+
+				strcat(audiotag_str,"| ");
+				x = tagdata_first_byte & 0x02;   //音频采样精度
+				x = x >> 1;
+				switch(x)
+				{
+					case 0:
+						strcat(audiotag_str,"8Bit");
+						break;
+					case 1:
+						strcat(audiotag_str,"16Bit");
+						break;
+					default:
+						strcat(audiotag_str,"UNKNOWN");
+						break;
+				}
+
+				strcat(audiotag_str,"| ");
+				x = tagdata_first_byte & 0x01;   //音频类型
+				switch(x)
+				{
+					case 0:
+						strcat(audiotag_str,"Mono");
+						break;
+					case 1:
+						strcat(audiotag_str,"Stereo");
+						break;
+					default:
+						strcat(audiotag_str,"UNKNOWN");
+						break;
+				}
+
+			    fprintf(myout,"%s",audiotag_str);
+				//if the output file hasn't been opened, open it.
+                if(output_a != 0 && afh == NULL)
+					afh = fopen("flv/output.mp3", "w");
+
+				//TagData - First Byte Data
+				int data_size = tagheader_datasize - 1;
+				if(output_a != 0)  //输出音频流
+				{
+					//TagData -1
+					for(int i=0; i<data_size; i++)
+						fputc(fgetc(ifh),afh);
+				}
+				else   // 不输出音频流
+				{
+					for(int i=0; i<data_size; i++)
+						fgetc(ifh);
+				//	byte audio[data_size];
+				//	fread(audio,1,data_size,ifh);
+				}
+
+				break;
+            }
+			case TAG_TYPE_VIDEO:
+			{
+				char videotag_str[100] = {0};
+				strcat(videotag_str,"| ");
+				char tagdata_first_byte;
+				//视频Tag Data也用开始的第1个字节包含视频数据的参数信息，从第2个字节开始为视频流数据,其中第1个字节的前4位的数值表示帧类型
+				//第1个字节的后4位的数值表示视频编码类型
+				tagdata_first_byte = fgetc(ifh);
+				int x = tagdata_first_byte & 0xF0;
+				x = x >> 4;  //获取视频帧类型
+				switch(x)
+				{
+					case 1: //keyframe（for AVC，a seekable frame）
+						strcat(videotag_str,"keyframe");
+						break;
+					case 2: //inter frame（for AVC，a nonseekable frame)
+						strcat(videotag_str,"inter frame");
+						break;
+					case 3: //disposable inter frame（H.263 only)
+						strcat(videotag_str,"disposable inter frame");
+						break;
+					case 4: //generated keyframe（reserved for server use)
+						strcat(videotag_str,"generated keyframe");
+						break;
+					case 5: //video info/command frame
+						strcat(videotag_str,"video info/command frame");
+						break;
+					default:
+						strcat(videotag_str,"UNKNOWN");
+						break;
+				}
+
+				strcat(videotag_str,"| ");
+				x = tagdata_first_byte & 0x0F;  //获取视频编码类型
+				switch(x)
+				{
+					case 1:
+						strcat(videotag_str,"JPEG (currently unused)");
+						break;
+					case 2:
+						strcat(videotag_str,"Sorenson H.263");
+						break;
+					case 3:
+						strcat(videotag_str,"Screen video");
+						break;
+					case 4:
+						strcat(videotag_str,"On2 VP6");
+						break;
+					case 5:
+						strcat(videotag_str,"On2 VP6 with alpha channel");
+						break;
+					case 6:
+						strcat(videotag_str,"Screen video version 2");
+						break;
+					case 7:
+						strcat(videotag_str,"AVC");
+						break;
+					default:
+						strcat(videotag_str,"UNKNOWN");
+						break;
+				}
+
+				fprintf(myout,"%s",videotag_str);
+				fseek(ifh, -1, SEEK_CUR);
+				//if the output file hasn't been opened, open it.
+				//提取第一个视频Tag
+				if(vfh == NULL && output_v != 0)
+				{
+					//write the flv header (reuse the original file's header) and first previoustagsize
+					vfh = fopen("flv/output.flv", "w");
+					fwrite((char *)&flv,1, sizeof(flv),vfh);
+					//重新定位文件指针到FLV Header末尾
+					fseek(vfh,flv.DataOffset-sizeof(flv),SEEK_CUR);
+					fwrite((char *)&previoustagsize_z,1,sizeof(previoustagsize_z),vfh);
+					//TagHeader
+                    fwrite((char *)&tagheader,1, sizeof(tagheader),vfh);
+                    //重新定位文件指针到Tag Header末尾
+                    fseek(vfh,11-sizeof(tagheader),SEEK_CUR);
+                    //TagData
+                    for(int i = 0; i < tagheader_datasize; i++)
+						fputc(fgetc(ifh),vfh);
+					//记录本视频Tag的大小
+					previousVedioTagsize = 11 + tagheader_datasize;
+				}
+				else if(output_v != 0)  //提取后续视频Tag
+				{
+					//Previous Tag Size
+                    fwrite((char *)&previousVedioTagsize,1, sizeof(previousVedioTagsize),vfh);
+                    int data_size = tagheader_datasize;
+					//TagHeader
+                    fwrite((char *)&tagheader,1, sizeof(tagheader),vfh);
+					//重新定位文件指针到Tag Header末尾
+                    fseek(vfh,11-sizeof(tagheader),SEEK_CUR);
+					//TagData
+					for(int i = 0; i < data_size; i++)
+						fputc(fgetc(ifh),vfh);
+					//记录本视频Tag的大小
+					previousVedioTagsize = 11 + tagheader_datasize;
+				}
+				else  //不输出视频流
+				{
+					for(int i = 0; i < tagheader_datasize; i++)
+						fgetc(ifh);
+				}
+			   break;
+			}
+			case TAG_TYPE_SCRIPT:
+			{
+				fprintf(myout,"\n============== Script Tag Data==============\n");
+				char scripttag_str[100] = {0};
+				char tagdata_first_byte;
+				//第一个AMF包：
+				//第1个字节表示AMF包类型，一般总是0x02，表示字符串。第2-3个字节为UI16类型值，标识字符串的长度，一般总是0x000A（“onMetaData”长度)
+				//后面字节为具体的字符串，一般总为“onMetaData”（6F,6E,4D,65,74,61,44,61,74,61)
+				tagdata_first_byte = fgetc(ifh);
+				if(tagdata_first_byte == 2)
+				{
+					int ScriptDataLen = 0;
+					byte tmp[2];
+					fread(tmp,1,2,ifh); //读取字符串长度
+					ScriptDataLen = tmp[0] * 256 + tmp[1];
+					byte Data[ScriptDataLen+1] = { 0 };
+					fread(Data,1,ScriptDataLen,ifh); //读取字符串onMetaData
+					sprintf(scripttag_str,"ScriptDataLen: %d,  ScriptDataValue: %s",ScriptDataLen,Data);
+					fprintf(myout,"[%6s]\n",scripttag_str);
+				}
+
+				//第二个AMF包：
+				//第1个字节表示AMF包类型，一般总是0x08，表示数组。第2-5个字节为UI32类型值，表示数组元素的个数。后面即为各数组元素的封装，数组元素为元素名称和值组成的对.
+				tagdata_first_byte = fgetc(ifh);
+				if(tagdata_first_byte == 8)
+				{
+					//读取ECMA array元素个数
+					int num = 0;
+					fread((char *)&num,1,4,ifh);
+					num = reverse_bytes((byte *)&num, sizeof(num));
+					fprintf(myout,"ECMA array elementNum: %d\n",num);
+					char key_value[100] = {0};
+					for(int i=0;i < num;i++)
+					{
+						//读取key字符串的长度
+					    int KeyLen = 0;
+						byte tmp[2];
+					    fread(tmp,1,2,ifh); //读取字符串长度
+					    KeyLen = tmp[0] * 256 + tmp[1];
+					    char KeyString[KeyLen+1] = { 0 };
+					    fread(KeyString,1,KeyLen,ifh); //读取Key字符串
+
+					    fprintf(myout,"===KeyString: %s\n",KeyString);
+					    if(!strcmp(KeyString,"duration") || !strcmp(KeyString,"width") || !strcmp(KeyString,"height")
+						    || !strcmp(KeyString,"videodatarate") || !strcmp(KeyString,"framerate") || !strcmp(KeyString,"videocodecid")
+							|| !strcmp(KeyString,"audiodatarate") || !strcmp(KeyString,"audiosamplerate") || !strcmp(KeyString,"audiosamplesize")
+							|| !strcmp(KeyString,"stereo") || !strcmp(KeyString,"audiocodecid") || !strcmp(KeyString,"filesize"))
+					    {
+							//读取value类型
+							byte value_type = fgetc(ifh);
+							if(value_type == 0)
+							{
+								//Number，8字节
+								//读取Key对应的Value
+								byte value[8] = { 0 };
+							    union DOUBLE{
+									 double numValue;
+									 long   value;
+								};
+								DOUBLE dataVal;
+								fread(value,1,8,ifh);
+					           // fprintf(myout,"===value[0]: %0X  value[1]: %0X, value[2]: %0X, value[3]: %0X, value[4]: %0X, value[5]: %0X, value[6]: %0X, value[7]: %0X\n",
+							   //         value[0],value[1],value[2],value[3],value[4],value[5],value[6],value[7]);
+
+								dataVal.value = ((long)value[0] << 56) | ((long)value[1] << 48) | ((long)value[2] << 40) |
+									           ((long)value[3] << 32) | ((long)value[4] << 24) | ((long)value[5] << 16) | ((long)value[6] << 8) | value[7];
+								if(!strcmp(KeyString,"duration"))//时长
+									fprintf(myout,"duration: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"width"))//视频宽度
+									fprintf(myout,"width: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"height"))//视频高度
+									fprintf(myout,"height: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"videodatarate"))//视频码率
+									fprintf(myout,"videodatarate: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"framerate"))//视频帧率
+									fprintf(myout,"framerate: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"videocodecid"))//视频编码方式
+									fprintf(myout,"videocodecid: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"audiodatarate"))//音频码率
+									fprintf(myout,"audiodatarate: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"audiosamplerate"))//音频采样率
+									fprintf(myout,"audiosamplerate: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"audiosamplesize"))//音频采样精度
+									fprintf(myout,"audiosamplesize: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"audiocodecid"))//音频编码方式
+									fprintf(myout,"audiocodecid: %.4lf\n",dataVal.numValue);
+								else if(!strcmp(KeyString,"filesize")){//文件大小
+									fprintf(myout,"filesize: %.4lf\n",dataVal.numValue);
+					                fprintf(myout,"===0==当前位置: %lu,  ScriTag Size: %d\n",ftell(ifh),tagheader_datasize);
+								}
+							}
+							else if(value_type == 1)
+							{
+								//Boolean ,1字节
+								//读取Key对应的Value
+								bool stereo = fgetc(ifh) != 0 ? true: false;
+								fprintf(myout,"stereo: %s\n",stereo?"立体声" : "单声道");
+							}
+					    }
+						else
+						{
+							//读取value类型
+							byte value_type = fgetc(ifh);
+							if(value_type == 0)
+								fseek(ifh, 8, SEEK_CUR);
+							else if(value_type == 1)
+								fseek(ifh, 1, SEEK_CUR);
+							else if(value_type == 2){
+								int ValueLen = 0;
+								byte tmp[2];
+								fread(tmp,1,2,ifh); //读取字符串长度
+                                ValueLen = tmp[0] * 256 + tmp[1];
+								fseek(ifh,ValueLen,SEEK_CUR); //跳过该字符串
+							}
+						}
+					}
+					if(ftell(ifh) != (tagheader_datasize+9+4+11))
+						fseek(ifh, tagheader_datasize+24, SEEK_SET);
+					fprintf(myout,"===1==当前位置: %lu,  ScriTag Size: %d   long: %lu,  double: %lu\n",ftell(ifh),tagheader_datasize,sizeof(long),sizeof(double));
+				}
+				fprintf(myout,"===2==当前位置: %lu,  ScriTag Size: %d\n",ftell(ifh),tagheader_datasize);
+			}
+		}
+		fprintf(myout,"\n");
+	}while (!feof(ifh));
+
+	fclose(ifh);
+	if(vfh)
+		fclose(vfh);
+	if(afh)
+		fclose(afh);
+
+	return 0;
+}
 
 int main(int argc, char* argv[])
 {
-	simplest_yuv420_split("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
-    simplest_yuv444_split("yuv444p/lena_256x256_yuv444p.yuv",256,256,1);
-    simplest_yuv420_gray("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
-    simplest_yuv420_halfy("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
-    simplest_yuv420_border("yuv420p/lena_256x256_yuv420p.yuv",256,256,20,1);
-    simplest_yuv420_graybar(640,360,0,255,10,"yuv420p/output_graybar_640x360.yuv");
-	simplest_yuv420_psnr("yuv420p/lena_256x256_yuv420p.yuv","yuv420p/lena_distort_256x256_yuv420p.yuv",256,256,1);
-	simplest_rgb24_split("rgb24/cie1931_500x500.rgb",500,500,1);
-	simplest_rgb24_to_bmp("rgb24/lena_256x256_rgb24.rgb",256,256,"rgb24/output_lena.bmp");
-	simplest_rgb24_to_yuv420("rgb24/lena_256x256_rgb24.rgb",256,256,1,"rgb24/output_lena_256x256_yuv420p.yuv");
-	simplest_rgb24_colorbar(640, 360,"rgb24/colorbar_640x360.rgb");
+//	simplest_yuv420_split("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+//    simplest_yuv444_split("yuv444p/lena_256x256_yuv444p.yuv",256,256,1);
+//    simplest_yuv420_gray("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+//    simplest_yuv420_halfy("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+//    simplest_yuv420_border("yuv420p/lena_256x256_yuv420p.yuv",256,256,20,1);
+//    simplest_yuv420_graybar(640,360,0,255,10,"yuv420p/output_graybar_640x360.yuv");
+//	simplest_yuv420_psnr("yuv420p/lena_256x256_yuv420p.yuv","yuv420p/lena_distort_256x256_yuv420p.yuv",256,256,1);
+//	simplest_rgb24_split("rgb24/cie1931_500x500.rgb",500,500,1);
+//	simplest_rgb24_to_bmp("rgb24/lena_256x256_rgb24.rgb",256,256,"rgb24/output_lena.bmp");
+//	simplest_rgb24_to_yuv420("rgb24/lena_256x256_rgb24.rgb",256,256,1,"rgb24/output_lena_256x256_yuv420p.yuv");
+//	simplest_rgb24_colorbar(640, 360,"rgb24/colorbar_640x360.rgb");
 
-	simplest_pcm16le_split("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-    simplest_pcm16le_halfvolumeleft("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-    simplest_pcm16le_doublespeed("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-    simplest_pcm16le_to_pcm8("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-    simplest_pcm16le_cut_singlechannel("pcm/drum.pcm",2360,120);
-    simplest_pcm16le_to_wave("pcm/NocturneNo2inEflat_44.1k_s16le.pcm",2,44100,"pcm/output_nocturne.wav");
+//	simplest_pcm16le_split("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+ //   simplest_pcm16le_halfvolumeleft("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+//    simplest_pcm16le_doublespeed("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+//    simplest_pcm16le_to_pcm8("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+//    simplest_pcm16le_cut_singlechannel("pcm/drum.pcm",2360,120);
+//    simplest_pcm16le_to_wave("pcm/NocturneNo2inEflat_44.1k_s16le.pcm",2,44100,"pcm/output_nocturne.wav");
 
-	simplest_h264_parser("h264/sintel.h264");
+//	simplest_h264_parser("h264/sintel.h264");
 
-	simplest_aac_parser("aac/nocturne.aac");
+//	simplest_aac_parser("aac/nocturne.aac");
+
+    simplest_flv_parser("flv/cuc_ieschool.flv");
 
 	return 0;
 }
