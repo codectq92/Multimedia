@@ -2046,11 +2046,12 @@ static int simplest_flv_parser(const char *url)
 							}
 						}
 					}
-					if(ftell(ifh) != (tagheader_datasize+9+4+11))
-						fseek(ifh, tagheader_datasize+24, SEEK_SET);
-					fprintf(myout,"===1==当前位置: %lu,  ScriTag Size: %d   long: %lu,  double: %lu\n",ftell(ifh),tagheader_datasize,sizeof(long),sizeof(double));
 				}
-				fprintf(myout,"===2==当前位置: %lu,  ScriTag Size: %d\n",ftell(ifh),tagheader_datasize);
+
+				//解析完脚本tag所需要的数据后，判断当前文件指针是否到达脚本TAG末尾，如果没有重新定位到Script Tag末尾，以便开始读取下一个Tag
+				if(ftell(ifh) != (tagheader_datasize+9+4+11))
+					fseek(ifh, tagheader_datasize+24, SEEK_SET);
+				fprintf(myout,"===1==当前位置: %lu,  ScriTag Size: %d   long: %lu,  double: %lu\n",ftell(ifh),tagheader_datasize,sizeof(long),sizeof(double));
 			}
 		}
 		fprintf(myout,"\n");
