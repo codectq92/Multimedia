@@ -1616,6 +1616,7 @@ static uint reverse_bytes(byte *p, char c)
 */
 static int simplest_flv_parser(const char *url)
 {
+	double fileSize = 0;
 	//whether output audio/video stream
 	int output_a = 1; //控制开关，1 输出音频流  0 不输出音频流
 	int output_v = 1; //控制开关，1 输出视频流  0 不输出视频流
@@ -1816,10 +1817,11 @@ static int simplest_flv_parser(const char *url)
 				}
 				else   // 不输出音频流
 				{
-					for(int i=0; i<data_size; i++)
-						fgetc(ifh);
-				//	byte audio[data_size];
-				//	fread(audio,1,data_size,ifh);
+					if((long)fileSize <= ftell(ifh)+data_size)
+						for(int i=0; i<data_size; i++)
+							fgetc(ifh);
+					else
+						fseek(ifh,data_size,SEEK_CUR);
 				}
 
 				break;
@@ -1925,8 +1927,11 @@ static int simplest_flv_parser(const char *url)
 				}
 				else  //不输出视频流
 				{
-					for(int i = 0; i < tagheader_datasize; i++)
-						fgetc(ifh);
+		            if((long)fileSize <= ftell(ifh)+tagheader_datasize)
+						for(int i = 0; i < tagheader_datasize; i++)
+							fgetc(ifh);
+					else
+						fseek(ifh,tagheader_datasize,SEEK_CUR);
 				}
 			   break;
 			}
@@ -2018,6 +2023,7 @@ static int simplest_flv_parser(const char *url)
 									fprintf(myout,"audiocodecid: %.4lf\n",dataVal.numValue);
 								else if(!strcmp(KeyString,"filesize")){//文件大小
 									fprintf(myout,"filesize: %.4lf\n",dataVal.numValue);
+									fileSize = dataVal.numValue;
 					                fprintf(myout,"===0==当前位置: %lu,  ScriTag Size: %d\n",ftell(ifh),tagheader_datasize);
 								}
 							}
@@ -2048,7 +2054,7 @@ static int simplest_flv_parser(const char *url)
 					}
 				}
 
-				//解析完脚本tag所需要的数据后，判断当前文件指针是否到达脚本TAG末尾，如果没有重新定位到Script Tag末尾，以便开始读取下一个Tag
+				//数组结束位，占3个字节 一定为 0x 00 00 09,跳过这三个字节，将当前文件指针定位到Script Tag末尾，以便开始读取下一个Tag
 				if(ftell(ifh) != (tagheader_datasize+9+4+11))
 					fseek(ifh, tagheader_datasize+24, SEEK_SET);
 				fprintf(myout,"===1==当前位置: %lu,  ScriTag Size: %d   long: %lu,  double: %lu\n",ftell(ifh),tagheader_datasize,sizeof(long),sizeof(double));
