@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <math.h>
 
 /////////////////////////////RGB、YUV像素数据处理///////////////////////////////////////
@@ -1940,6 +1944,37 @@ static int simplest_flv_parser(const char *url)
 				fprintf(myout,"\n============== Script Tag Data==============\n");
 				char scripttag_str[100] = {0};
 				char tagdata_first_byte;
+
+				/*脚本TAG中AMF数据第一个byte为此数据的类型，类型有:
+				 * AMF_NUMBER = 0×00 代表double类型.占8字节
+				 * AMF_BOOLEAN = 0×01 代表bool类型,占1字节
+				 * AMF_STRING = 0×02 代表string类型,紧接着后面的2个字节表示字符串UTF8长度len,接着后面len个字节表示字符串UTF8格式的内容.
+				 * AMF_OBJECT = 0×03 代表Hashtable，内容由UTF8字符串作为Key，其他AMF类型作为Value，该对象由3个字节：00 00 09来表示结束.
+				 * AMF_MOVIECLIP = 0×04	不可用
+				 * AMF_NULL = 0×05 Null就是空对象，该对象只占用一个字节，那就是Null对象标识0x05
+				 * AMF_UNDEFINED = 0x06 Undefined也是只占用一个字节0x06
+				 * AMF_REFERENCE = 0×07
+				 * AMF_ECMA_ARRAY = 0×08 相当于Hashtable，与0x03不同的是用4个bytes记录该Hashtable的大小.
+				 * AMF_OBJECT_END = 0×09 表示object结束
+				 * AMF_STRICT_ARRAY = 0x0a
+				 * AMF_DATE = 0x0b
+				 * AMF_LONG_STRING = 0x0c
+				 * AMF_UNSUPPORTED = 0x0d
+				 * AMF_RECORDSET = 0x0e
+				 * AMF_XML_DOC = 0x0f
+				 * AMF_TYPED_OBJECT = 0×10
+				 * AMF_AVMPLUS = 0×11
+				 * AMF_INVALID = 0xff
+				 *
+				 * rtmp协议中数据都是大端的，所以在放数据前都要将数据转成大端的形式。AMF数据采用 Big-Endian（大端模式），主机采用Little-Endian（小端模式)
+				 * 大端Big-Endian
+				 * 低地址存放最高有效位（MSB），即高位字节排放在内存的低地址端，低位字节排放在内存的高地址端.符合人脑逻辑，与计算机逻辑不同
+				 *
+				 * 网络字节序 Network Order:TCP/IP各层协议将字节序定义为Big-Endian，因此TCP/IP协议中使用的字节序通常称之为网络字节序.
+				 * 主机序 Host Orader:它遵循Little-Endian规则。所以当两台主机之间要通过TCP/IP协议进行通信的时候就需要调用相应的函数进行主机序（Little-Endian）
+				 * 和网络序（Big-Endian）的转换。
+				 */
+
 				//第一个AMF包：
 				//第1个字节表示AMF包类型，一般总是0x02，表示字符串。第2-3个字节为UI16类型值，标识字符串的长度，一般总是0x000A（“onMetaData”长度)
 				//后面字节为具体的字符串，一般总为“onMetaData”（6F,6E,4D,65,74,61,44,61,74,61)
@@ -2072,32 +2107,277 @@ static int simplest_flv_parser(const char *url)
 	return 0;
 }
 
+
+///////////////////////////////UDP-RTP协议解析////////////////////////////////////////////
+
+/*
+* [memo] FFmpeg stream Command:
+* 推流UDP封装的MPEG-TS
+* ffmpeg -re -i sintel.ts -f mpegts udp://127.0.0.1:8888
+* 推流首先经过RTP封装，然后经过UDP封装的MPEG-TS
+* ffmpeg -re -i sintel.ts -strict -2 -f rtp_mpegts udp://127.0.0.1:8888
+*
+* 测试步骤
+* 1 执行a.out程序
+* 2 采用ffmpeg -re -i sintel.ts -strict -2 -f rtp_mpegts udp://127.0.0.1:8888 进行推流，
+*   因为代码中parse_rtp开关开启，为0则使用ffmpeg -re -i sintel.ts -f mpegts udp://127.0.0.1:8888 推流
+*/
+#define CPU_LITTLE_ENDIAN 1
+//对于RTP协议头，由于大小端对结构体的位域也有影响，定义的时候要考虑大小端问题
+typedef struct RTP_FIXED_HEADER
+{
+#ifdef CPU_LITTLE_ENDIAN
+	/* byte 0 */
+	unsigned char csrc_len:4;       /* CSRC计数器，占4位，指示CSRC 标识符的个数,expect 0 */
+	unsigned char extension:1;      /* 扩展标志，占1位，如果X=1，则在RTP报头后跟有一个扩展报头,expect 1 */
+	unsigned char padding:1;        /* 填充标志，占1位，如果P=1，则在该报文的尾部填充一个或多个额外的八位组，它们不是有效载荷的一部分,expect 0 */
+	unsigned char version:2;        /*RTP协议的版本号，占2位, expect 2 */
+
+	/* byte 1 */
+	unsigned char payload:7;       //有效荷载类型，占7位，用于说明RTP报文中有效载荷的类型，如GSM音频、JPEM图像等,在流媒体中大部分是用来区分音频流和视频流的，这样便于客户端进行解析
+	unsigned char marker:1;        /* 标记，占1位，不同的有效载荷有不同的含义，对于视频，标记一帧的结束；对于音频，标记会话的开始,expect 1 */
+#else
+	/* byte 0 */
+	unsigned char version:2;
+	unsigned char padding:1;
+	unsigned char extension:1;
+    unsigned char csrc_len:4;
+
+	/* byte 1 */
+	unsigned char marker:1;
+	unsigned char payload:7;
+#endif
+
+	/* bytes 2, 3 */
+	unsigned short seq_no;        //序列号,占16位，用于标识发送者所发送的RTP报文的序列号，每发送一个报文，序列号增1。这个字段当下层的承载协议用UDP的时候,
+                                  //网络状况不好的时候可以用来检查丢包。同时出现网络抖动的情况可以用来对数据进行重新排序，序列号的初始值是随机的，同时音频包和视频包的sequence是分别记数的.
+	/* bytes 4-7 */
+	unsigned int timestamp;       //时戳,占32位，必须使用90 kHz 时钟频率。时戳反映了该RTP报文的第一个八位组的采样时刻。接收者使用时戳来计算延迟和延迟抖动，并进行同步控制.
+
+	/* bytes 8-11 */
+	unsigned int ssrc;           //同步信源(SSRC)标识符：占32位，用于标识同步信源。该标识符是随机选择的，参加同一视频会议的两个同步信源不能有相同的SSRC.
+
+}RTP_FIXED_HEADER;
+
+//针对MPEG2-TS协议包格式及头参数介绍如下:
+// header + payload  ... header + payload
+// 其中header + payload为一个TS包，占188字节。包头结构如下定义,包头占4字节，payload数据占184字节
+//MPEG-TS包头结构
+typedef struct MPEGTS_FIXED_HEADER
+{
+	unsigned sync_byte: 8;                        //同步字节,固定为0x47 ,表示后面的是一个TS分组,说明从这个字节后的188个字节都属于一个ts包
+	unsigned transport_error_indicator: 1;        //错误指示信息
+	unsigned payload_unit_start_indicator: 1;     //负载单元开始标志
+	unsigned transport_priority: 1;               //传输优先级标志
+	unsigned PID: 13;                             //packet ID号码，唯一的号码对应不同的包,PID是TS流中包的唯一标志，表示了这个ts包负载数据的类型，Packet Data中是什么内容，完全由PID来决定.
+	unsigned transport_scrambling_control: 2;     //加密标志
+	unsigned adaptation_field_control: 2;         //附加区域控制
+	unsigned continuity_counter: 4;               //包递增计数器
+} MPEGTS_FIXED_HEADER;
+
+static int simplest_udp_parser(int port)
+{
+	int cnt = 0;
+	//FILE *myout=fopen("output_log.txt","wb+");
+	FILE *myout = stdout;
+
+	FILE *fp1 = fopen("udp-rtp/output_dump.ts","w+");
+
+	int serSocket = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+	if(serSocket ==-1){
+		fprintf(myout,"socket:%m\n");
+		return -1;
+	}
+	fprintf(myout,"建立socket成功\n");
+
+	struct sockaddr_in serAddr;
+	serAddr.sin_family = AF_INET;
+	serAddr.sin_port = htons(port);
+	inet_aton("127.0.0.1",&serAddr.sin_addr);
+
+	if(bind(serSocket,(struct sockaddr*)&serAddr, sizeof(serAddr)) == -1){
+		fprintf(myout,"bind error: %m!\n");
+		close(serSocket);
+		return -1;
+	}
+
+	struct sockaddr_in remoteAddr;
+	socklen_t nAddrLen = sizeof(remoteAddr);
+
+	int parse_rtp = 1; //通过UDP推流RTP封装的MPEG-TS
+	int parse_mpegts = 1;//MPEG-TS解析开关
+	fprintf(myout,"Listening on port %d\n",port);
+
+	char recvData[10000];
+
+	while(1)
+	{
+		int pktsize = recvfrom(serSocket,recvData,sizeof(recvData),0,(struct sockaddr *)&remoteAddr,&nAddrLen);
+		if(pktsize > 0)
+		{
+			fprintf(myout,"packet size:%d, 发送者IP: %s,端口: %hu\n",pktsize,inet_ntoa(remoteAddr.sin_addr),ntohs(remoteAddr.sin_port));
+
+			//Parse RTP
+			if(parse_rtp != 0)
+			{
+				char payload_str[50] = {0};
+				RTP_FIXED_HEADER rtp_header;
+				int rtp_header_size = sizeof(RTP_FIXED_HEADER);
+
+				//RTP Header
+				memcpy((void *)&rtp_header,recvData,rtp_header_size);
+
+				//RFC3551
+				char payload = rtp_header.payload;
+				switch(payload)
+				{
+					case 0:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","PCMU","Audio","8khz","1");
+						break;
+					case 1:
+					case 2:
+						sprintf(payload_str,"media type:%s","Audio");
+						break;
+					case 3:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","GSM","Audio","8khz","1");
+						break;
+					case 4:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","G723","Audio","8khz","1");
+						break;
+					case 5:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","DVI4","Audio","8khz","1");
+						break;
+					case 6:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","DVI4","Audio","16khz","1");
+						break;
+					case 7:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","LPC","Audio","8khz","1");
+						break;
+					case 8:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","PCMA","Audio","8khz","1");
+						break;
+					case 9:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","G722","Audio","8khz","1");
+						break;
+					case 10:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","L16","Audio","44.1khz","2");
+						break;
+					case 11:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","L16","Audio","44.1khz","1");
+						break;
+					case 12:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","QCELP","Audio","8khz","1");
+						break;
+					case 13:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","CN","Audio","8khz","1");
+						break;
+					case 14:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","MPA","Audio","90khz","1");
+						break;
+					case 15:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","G728","Audio","8khz","1");
+						break;
+					case 16:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","DVI4","Audio","11.025khz","1");
+						break;
+					case 17:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","DVI4","Audio","22.05khz","1");
+						break;
+					case 18:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","G729","Audio","8khz","1");
+						break;
+					case 25:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s","CelB","Vedio","90khz");
+						break;
+					case 26:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s","JPEG","Vedio","90khz");
+						break;
+					case 31:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s","H261","Vedio","90khz");
+						break;
+					case 32:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s","MPV","Vedio","90khz");
+						break;
+					case 33:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s","MP2T","AV","90khz");
+						break;
+					case 34:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s","H263","Vedio","90khz");
+						break;
+					case 96:
+						sprintf(payload_str,"encoding name: %s,media type: %s,clock rate:%s,channels:%s","PCMU","Audio","8khz","2");
+						break;
+				}
+
+				unsigned int timestamp = ntohl(rtp_header.timestamp);
+				unsigned int seq_no = ntohs(rtp_header.seq_no);
+				fprintf(myout,"[RTP Pkt] %5d| %5s| %10u| %5d| %5d|\n",cnt,payload_str,timestamp,seq_no,pktsize);
+
+				//RTP Data
+				char *rtp_data = recvData + rtp_header_size;
+				int rtp_data_size = pktsize - rtp_header_size;
+				fwrite(rtp_data,rtp_data_size,1,fp1);
+
+				//Parse MPEGTS
+				if(parse_mpegts != 0 && payload == 33)
+				{
+					//暂时不对MPEG-TS流解析
+					MPEGTS_FIXED_HEADER mpegts_header;
+					for(int i=0;i<rtp_data_size;i=i+188)
+					{
+						//判断是否是一个TS包的开始
+						if(rtp_data[i] != 0x47)
+							break;
+						//MPEGTS Header
+						//memcpy((void *)&mpegts_header,rtp_data+i,sizeof(MPEGTS_FIXED_HEADER));
+						fprintf(myout,"   [MPEGTS Pkt]\n");
+					}
+				}
+			}
+			else
+			{
+				fprintf(myout,"[UDP Pkt] %5d| %5d|\n",cnt,pktsize);
+				fwrite(recvData,pktsize,1,fp1);
+			}
+
+			cnt++;
+		}
+	}
+
+	close(serSocket);
+	fclose(fp1);
+	return 0;
+}
+
+
 int main(int argc, char* argv[])
 {
-//	simplest_yuv420_split("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+//	  simplest_yuv420_split("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
 //    simplest_yuv444_split("yuv444p/lena_256x256_yuv444p.yuv",256,256,1);
 //    simplest_yuv420_gray("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
 //    simplest_yuv420_halfy("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
 //    simplest_yuv420_border("yuv420p/lena_256x256_yuv420p.yuv",256,256,20,1);
 //    simplest_yuv420_graybar(640,360,0,255,10,"yuv420p/output_graybar_640x360.yuv");
-//	simplest_yuv420_psnr("yuv420p/lena_256x256_yuv420p.yuv","yuv420p/lena_distort_256x256_yuv420p.yuv",256,256,1);
-//	simplest_rgb24_split("rgb24/cie1931_500x500.rgb",500,500,1);
-//	simplest_rgb24_to_bmp("rgb24/lena_256x256_rgb24.rgb",256,256,"rgb24/output_lena.bmp");
-//	simplest_rgb24_to_yuv420("rgb24/lena_256x256_rgb24.rgb",256,256,1,"rgb24/output_lena_256x256_yuv420p.yuv");
-//	simplest_rgb24_colorbar(640, 360,"rgb24/colorbar_640x360.rgb");
+//	  simplest_yuv420_psnr("yuv420p/lena_256x256_yuv420p.yuv","yuv420p/lena_distort_256x256_yuv420p.yuv",256,256,1);
+//	  simplest_rgb24_split("rgb24/cie1931_500x500.rgb",500,500,1);
+//	  simplest_rgb24_to_bmp("rgb24/lena_256x256_rgb24.rgb",256,256,"rgb24/output_lena.bmp");
+//	  simplest_rgb24_to_yuv420("rgb24/lena_256x256_rgb24.rgb",256,256,1,"rgb24/output_lena_256x256_yuv420p.yuv");
+//	  simplest_rgb24_colorbar(640, 360,"rgb24/colorbar_640x360.rgb");
 
-//	simplest_pcm16le_split("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
- //   simplest_pcm16le_halfvolumeleft("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+//	  simplest_pcm16le_split("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+//    simplest_pcm16le_halfvolumeleft("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
 //    simplest_pcm16le_doublespeed("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
 //    simplest_pcm16le_to_pcm8("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
 //    simplest_pcm16le_cut_singlechannel("pcm/drum.pcm",2360,120);
 //    simplest_pcm16le_to_wave("pcm/NocturneNo2inEflat_44.1k_s16le.pcm",2,44100,"pcm/output_nocturne.wav");
 
-//	simplest_h264_parser("h264/sintel.h264");
+//	  simplest_h264_parser("h264/sintel.h264");
 
-//	simplest_aac_parser("aac/nocturne.aac");
+//	  simplest_aac_parser("aac/nocturne.aac");
 
-    simplest_flv_parser("flv/cuc_ieschool.flv");
+//    simplest_flv_parser("flv/cuc_ieschool.flv");
+
+	simplest_udp_parser(8888);
 
 	return 0;
 }
