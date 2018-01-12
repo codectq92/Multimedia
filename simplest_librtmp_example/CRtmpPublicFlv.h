@@ -1,12 +1,12 @@
 /*************************************************************************
-    > File Name: CRtmpDumpFlv.h
+    > File Name: CRtmpPublicFlv.h
     > Author: zhongjihao
     > Mail: zhongjihao100@163.com
     > Created Time: 2018年01月08日 星期一 15时10分53秒
  ************************************************************************/
 
-#ifndef RTMP_SEND_RECV_FLV_H
-#define RTMP_SEND_RECV_FVL_H
+#ifndef RTMP_PUBLIC_FLV_H
+#define RTMP_PUBLIC_FLV_H
 
 #include "libRTMP/rtmpdump/librtmp/rtmp_sys.h"
 #include "libRTMP/rtmpdump/librtmp/log.h"
@@ -17,15 +17,11 @@
 #define RD_NO_CONNECT     3
 
 
-//通过RTMP流媒体协议发送和接收FLV数据
-class CRtmpDumpFlv
+//将FLV格式的音视频文件使用RTMP推送至RTMP流媒体服务器
+class CRtmpPublicFlv
 {
 private:
 	RTMP *m_pRtmp;
-	//是否是直播流
-	bool m_bLiveStream;
-	//接收FLV流媒体文件
-	FILE* m_recvFile;
 
 private:
 	//RTMP初始化
@@ -38,16 +34,12 @@ private:
 	void Rtmp_Free();
 
 public:
-	CRtmpDumpFlv();
-	~CRtmpDumpFlv();
-	//设置是否是直播流
-	void Rtmp_SetIsLiveStream(bool isLiveStream);
+	CRtmpPublicFlv();
+	~CRtmpPublicFlv();
 	//设置RTMP中log级别
 	void Rtmp_LogSetLevel(RTMP_LogLevel level);
 	//设置RTMP中log输出文件
 	void Rtmp_LogSetOutput(FILE* logoutfile);
-	//FLV输出文件
-	void Rtmp_FlvSetOutput(FILE* flvoutfile);
 	//设置RTMP连接的URL
 	int Rtmp_SetupURL(const char *url);
 	//设置RTMP中buffer time
@@ -56,12 +48,12 @@ public:
 	int Rtmp_Connect();
 	//建立RTMP网络流NetStream
 	int Rtmp_ConnectStream();
-	//接收RTMP流媒体服务器数据
-	int Rtmp_Read();
+	//使用RTMP_SendPacket该API发布本地FLV文件到服务器
+	int Rtmp_publish_using_packet(const char* sourceFlv,const char* destRtmpUrl);
+	//使用RTMP_Write该API发布本地FLV文件到服务器
+	int Rtmp_publish_using_write(const char* sourceFlv,const char* destRtmpUrl);
 };
 
-
 #endif
-
 
 

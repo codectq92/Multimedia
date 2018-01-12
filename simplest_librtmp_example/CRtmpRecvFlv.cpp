@@ -1,5 +1,5 @@
 /*************************************************************************
-    > File Name: CRtmpDumpFlv.cpp
+    > File Name: CRtmpRecvFlv.cpp
     > Author: zhongjihao
     > Mail: zhongjihao100@163.com
     > Created Time: 2018年01月08日 星期一 15时10分53秒
@@ -7,9 +7,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "CRtmpDumpFlv.h"
+#include "CRtmpRecvFlv.h"
 
-CRtmpDumpFlv::CRtmpDumpFlv()
+
+CRtmpRecvFlv::CRtmpRecvFlv()
 {
 	m_pRtmp = Rtmp_Alloc();
 	Rtmp_Init();
@@ -17,47 +18,47 @@ CRtmpDumpFlv::CRtmpDumpFlv()
 	m_pRtmp->Link.timeout = 10;
 }
 
-CRtmpDumpFlv::~CRtmpDumpFlv()
+CRtmpRecvFlv::~CRtmpRecvFlv()
 {
 	Rtmp_Close();
 	Rtmp_Free();
-	m_pRtmp = NULL;
 }
 
-void CRtmpDumpFlv::Rtmp_Init()
+void CRtmpRecvFlv::Rtmp_Init()
 {
 	RTMP_Init(m_pRtmp);
 }
 
-RTMP* CRtmpDumpFlv::Rtmp_Alloc()
+RTMP* CRtmpRecvFlv::Rtmp_Alloc()
 {
 	return RTMP_Alloc();
 }
 
-void CRtmpDumpFlv::Rtmp_Free()
+void CRtmpRecvFlv::Rtmp_Free()
 {
 	if(m_pRtmp)
 		RTMP_Free(m_pRtmp);
+	m_pRtmp = NULL;
 }
 
-void CRtmpDumpFlv::Rtmp_Close()
+void CRtmpRecvFlv::Rtmp_Close()
 {
 	if(m_pRtmp)
 		RTMP_Close(m_pRtmp);
 }
 
-void CRtmpDumpFlv::Rtmp_SetBufferMS(int bufferTime)
+void CRtmpRecvFlv::Rtmp_SetBufferMS(int bufferTime)
 {
 	RTMP_Log(RTMP_LOGDEBUG, "%s: ====haoge=====Setting buffer time to: %dms", __FUNCTION__,bufferTime);
 	RTMP_SetBufferMS(m_pRtmp, bufferTime);
 }
 
-void CRtmpDumpFlv::Rtmp_LogSetLevel(RTMP_LogLevel level)
+void CRtmpRecvFlv::Rtmp_LogSetLevel(RTMP_LogLevel level)
 {
 	RTMP_LogSetLevel(level);
 }
 
-void CRtmpDumpFlv::Rtmp_SetIsLiveStream(bool isLiveStream)
+void CRtmpRecvFlv::Rtmp_SetIsLiveStream(bool isLiveStream)
 {
 	m_bLiveStream = isLiveStream;
 	if(m_bLiveStream)
@@ -66,17 +67,17 @@ void CRtmpDumpFlv::Rtmp_SetIsLiveStream(bool isLiveStream)
 	}
 }
 
-void CRtmpDumpFlv::Rtmp_LogSetOutput(FILE* logoutfile)
+void CRtmpRecvFlv::Rtmp_LogSetOutput(FILE* logoutfile)
 {
 	RTMP_LogSetOutput(logoutfile);
 }
 
-void CRtmpDumpFlv::Rtmp_FlvSetOutput(FILE* flvoutfile)
+void CRtmpRecvFlv::Rtmp_FlvSetOutput(FILE* flvoutfile)
 {
 	m_recvFile = flvoutfile;
 }
 
-int CRtmpDumpFlv::Rtmp_SetupURL(const char *url)
+int CRtmpRecvFlv::Rtmp_SetupURL(const char *url)
 {
 	if(!RTMP_SetupURL(m_pRtmp,const_cast<char*>(url)))
 	{
@@ -87,7 +88,7 @@ int CRtmpDumpFlv::Rtmp_SetupURL(const char *url)
 	return RD_SUCCESS;
 }
 
-int CRtmpDumpFlv::Rtmp_Connect()
+int CRtmpRecvFlv::Rtmp_Connect()
 {
 	RTMP_Log(RTMP_LOGDEBUG,"%s: ====haoge====Connecting ...",__FUNCTION__);
 	if(!RTMP_Connect(m_pRtmp, NULL))
@@ -101,7 +102,7 @@ int CRtmpDumpFlv::Rtmp_Connect()
     return RD_SUCCESS;
 }
 
-int CRtmpDumpFlv::Rtmp_ConnectStream()
+int CRtmpRecvFlv::Rtmp_ConnectStream()
 {
 	RTMP_Log(RTMP_LOGDEBUG,"%s: ====haoge====ConnectStream ...",__FUNCTION__);
 	if(!RTMP_ConnectStream(m_pRtmp, 0))
@@ -116,7 +117,7 @@ int CRtmpDumpFlv::Rtmp_ConnectStream()
 	return RD_SUCCESS;
 }
 
-int CRtmpDumpFlv::Rtmp_Read()
+int CRtmpRecvFlv::Rtmp_Read()
 {
 	if(!m_recvFile)
 	{
