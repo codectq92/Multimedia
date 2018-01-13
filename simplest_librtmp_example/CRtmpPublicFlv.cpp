@@ -119,7 +119,7 @@ int CRtmpPublicFlv::Rtmp_publish_using_packet(const char* sourceFlv,const char* 
 	uint32_t preTagsize = 0;
 	
 	//packet attributes
-	uint32_t type = 0;          //FLV规范中Tag的类型，占1字节，0x09表示视频、0x08表示音频、0x12表示Script		
+	uint32_t type = 0;          //FLV规范中Tag的类型，占1字节，0x09表示视频、0x08表示音频、0x12表示Script
 	uint32_t datalength = 0;    //表示Tag 数据部分的大小，占3字节		
 	uint32_t timestamp = 0;     //Tag 中3字节时间戳 和 1字节时间戳扩展字节
 	uint32_t streamid = 0;		//Tag 中流ID，占3字节	
@@ -268,8 +268,132 @@ int CRtmpPublicFlv::Rtmp_publish_using_packet(const char* sourceFlv,const char* 
 
 int CRtmpPublicFlv::Rtmp_publish_using_write(const char* sourceFlv,const char* destRtmpUrl)
 {
-	return 0;
+	uint32_t start_time = 0;
+	uint32_t now_time = 0;
+	long pre_frame_time = 0;
+	uint32_t lasttime = 0;
+	int bNextIsKey = 0;
+	char* pFileBuf = NULL;
+	int totalByte = 0;
 
+	//read from tag header
+	uint32_t type = 0;          //FLV规范中Tag的类型，占1字节，0x09表示视频、0x08表示音频、0x12表示Script
+	uint32_t datalength = 0;    //表示Tag 数据部分的大小，占3字
+	uint32_t timestamp = 0;     //Tag 中3字节时间戳 和 1字节时间戳扩展字节
+
+	FILE* fp = NULL;
+	fp = fopen(sourceFlv,"r");
+	if (!fp)
+	{
+		RTMP_LogPrintf("%s: =====haoge=====Open File Error.\n",__FUNCTION__);
+		return RD_FAILED;
+	}
+
+	if(Rtmp_SetupURL(destRtmpUrl) != RD_SUCCESS)
+		return RD_FAILED;
+
+	//if unable,the AMF command would be 'play' instead of 'publish'
+	//发布流的时候必须要使用。如果不使用则代表接收流
+	RTMP_EnableWrite(m_pRtmp);
+
+	//1 hour
+	Rtmp_SetBufferMS(3600*1000);
+
+	//建立RTMP连接，创建一个RTMP协议规范中的NetConnection
+	if(Rtmp_Connect() != RD_SUCCESS)
+		return RD_FAILED;
+
+	//创建一个RTMP协议规范中的NetStream
+	if(Rtmp_ConnectStream() != RD_SUCCESS)
+		return RD_FAILED;
+
+	printf("%s: ====haoge====Start to send data ...\n",__FUNCTION__);
+
+    //jump over FLV Header
+	fseek(fp,9,SEEK_SET);
+	//jump over previousTagSizen
+	fseek(fp,4,SEEK_CUR);
+	start_time = RTMP_GetTime();
+
+	while(1)
+	{
+		if((((now_time = RTMP_GetTime()) -start_time) < (pre_frame_time)) )
+		{
+			//wait for 1 sec if the send process is too fast
+			//this mechanism is not very good,need some improvement
+			if(pre_frame_time>lasttime)
+			{
+				RTMP_LogPrintf("%s: =====haoge======TimeStamp:%8lu ms\n",__FUNCTION__,pre_frame_time);
+				lasttime = pre_frame_time;
+			}
+
+			sleep(1);
+			continue;
+		}
+
+		//jump over type
+		fseek(fp,1,SEEK_CUR);
+		if(!CNetByteOper::ReadU24(&datalength,fp))
+			break;
+		if(!CNetByteOper::ReadTime(&timestamp,fp))
+			break;
+		//jump back
+		fseek(fp,-8,SEEK_CUR);
+
+		pFileBuf = (char*)malloc(11+datalength+4);
+		memset(pFileBuf,0,11+datalength+4);
+		if(fread(pFileBuf,1,11 + datalength + 4,fp) != (11 + datalength + 4))
+			break;
+
+		pre_frame_time = timestamp;
+
+		if (!RTMP_IsConnected(m_pRtmp))
+		{
+			RTMP_Log(RTMP_LOGERROR,"%s: ====haoge======rtmp is not connect\n",__FUNCTION__);
+			break;
+		}
+		int sendByte = RTMP_Write(m_pRtmp,pFileBuf,11+datalength+4);
+		totalByte = totalByte + (11+4+datalength);
+		RTMP_Log(RTMP_LOGERROR,"%s: ====haoge======send %d Byte, TagDataSize: %d Byte , totalByte: %d Byte\n",__FUNCTION__,sendByte,15+datalength,totalByte);
+		if (!sendByte/*RTMP_Write(m_pRtmp,pFileBuf,11+datalength+4)*/)
+		{
+			RTMP_Log(RTMP_LOGERROR,"%s: ======haoge====Rtmp Write Error\n",__FUNCTION__);
+			break;
+		}
+
+		free(pFileBuf);
+		pFileBuf = NULL;
+
+		if(!CNetByteOper::PeekU8(&type,fp))
+			break;
+
+		if(type == 0x09)
+		{
+			if(fseek(fp,11,SEEK_CUR) != 0)
+				break;
+			if(!CNetByteOper::PeekU8(&type,fp)){
+				break;
+			}
+			if(type == 0x17)
+				bNextIsKey = 1;
+			else
+				bNextIsKey = 0;
+			fseek(fp,-11,SEEK_CUR);
+		}
+	}
+
+	RTMP_LogPrintf("%s: ====haoge=====Send %d Byte Data Over\n",__FUNCTION__,totalByte);
+
+	if(fp)
+		fclose(fp);
+
+	if(pFileBuf)
+	{
+		free(pFileBuf);
+		pFileBuf = NULL;
+	}
+
+	return totalByte;
 }
 
 
