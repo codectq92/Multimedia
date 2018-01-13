@@ -167,9 +167,8 @@ int CRtmpPublicFlv::Rtmp_publish_using_packet(const char* sourceFlv,const char* 
 
 	while(1)
 	{
-		
 		//发布流过程中的延时，保证按正常播放速度发送数据
-		if( ( ( (now_time = RTMP_GetTime()) - start_time) < pre_frame_time ) && bNextIsKey)
+		if( ((now_time = RTMP_GetTime()) - start_time) < pre_frame_time )
 		{	
 			//wait for 1 sec if the send process is too fast
 			//this mechanism is not very good,need some improvement
@@ -178,7 +177,7 @@ int CRtmpPublicFlv::Rtmp_publish_using_packet(const char* sourceFlv,const char* 
 				RTMP_LogPrintf("%s: ======haoge=====TimeStamp:%8lu ms\n",__FUNCTION__,pre_frame_time);
 				lasttime = pre_frame_time;
 			}
-			sleep(2);
+			sleep(1);
 			continue;
 		}
 
