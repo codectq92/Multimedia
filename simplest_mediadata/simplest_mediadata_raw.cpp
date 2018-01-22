@@ -95,20 +95,20 @@ static void YUV420PClockRot180(unsigned char* dest,unsigned char* src,int w,int 
 static int simplest_yuv420_split(const char *url, int w, int h,int num)
 {
 	FILE *fp  = fopen(url,"r+");  
-	FILE *fp1 = fopen("yuv420p/output_420_y.y","w+");  
-	FILE *fp2 = fopen("yuv420p/output_420_u.y","w+");  
-    FILE *fp3 = fopen("yuv420p/output_420_v.y","w+");
+	FILE *fp1 = fopen("out/yuv420p/output_420_y.y","w+");
+	FILE *fp2 = fopen("out/yuv420p/output_420_u.y","w+");
+    FILE *fp3 = fopen("out/yuv420p/output_420_v.y","w+");
 
 	char yuv[40];
-	sprintf(yuv,"yuv420p/output_%dx%d_yuv420p.yuv",w,h);
+	sprintf(yuv,"out/yuv420p/output_%dx%d_yuv420p.yuv",w,h);
 	FILE* fp4 = fopen(yuv,"w+");
 
 	char yuvClockRot90[50];
-	sprintf(yuvClockRot90,"yuv420p/output_clockrot90_%dx%d_yuv420p.yuv",h,w);
+	sprintf(yuvClockRot90,"out/yuv420p/output_clockrot90_%dx%d_yuv420p.yuv",h,w);
 	FILE* fpClockRot90 = fopen(yuvClockRot90,"w+");
 
 	char yuvClockRot180[50];
-	sprintf(yuvClockRot180,"yuv420p/output_clockrot180_%dx%d_yuv420p.yuv",h,w);
+	sprintf(yuvClockRot180,"out/yuv420p/output_clockrot180_%dx%d_yuv420p.yuv",h,w);
 	FILE* fpClockRot180 = fopen(yuvClockRot180,"w+");
 
     unsigned char *pic = (unsigned char *)malloc(w*h*3/2);
@@ -161,13 +161,13 @@ static int simplest_yuv420_split(const char *url, int w, int h,int num)
 static int simplest_yuv444_split(const char *url, int w, int h,int num)
 {
 	FILE *fp = fopen(url,"r+");  
-	FILE *fp1 = fopen("yuv444p/output_444_y.y","w+");  
-	FILE *fp2 = fopen("yuv444p/output_444_u.y","w+");  
-	FILE *fp3 = fopen("yuv444p/output_444_v.y","w+");
+	FILE *fp1 = fopen("out/yuv444p/output_444_y.y","w+");
+	FILE *fp2 = fopen("out/yuv444p/output_444_u.y","w+");
+	FILE *fp3 = fopen("out/yuv444p/output_444_v.y","w+");
 
 
 	char yuv444p[40];
-	sprintf(yuv444p,"yuv444p/output_%dx%d_yuv444p.yuv",w,h);
+	sprintf(yuv444p,"out/yuv444p/output_%dx%d_yuv444p.yuv",w,h);
 	FILE* fp4 = fopen(yuv444p,"w+");
 
 	unsigned char *pic = (unsigned char *)malloc(w*h*3);
@@ -207,7 +207,7 @@ static int simplest_yuv444_split(const char *url, int w, int h,int num)
 static int simplest_yuv420_gray(const char *url, int w, int h,int num)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("yuv420p/output_gray.yuv","w+");
+	FILE *fp1 = fopen("out/yuv420p/output_gray.yuv","w+");
 	
 	unsigned char *pic = (unsigned char *)malloc(w*h*3/2);
 	
@@ -235,7 +235,7 @@ static int simplest_yuv420_gray(const char *url, int w, int h,int num)
 static int simplest_yuv420_halfy(const char *url, int w, int h,int num)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("yuv420p/output_half.yuv","w+");
+	FILE *fp1 = fopen("out/yuv420p/output_half.yuv","w+");
 		    
 	unsigned char *pic = (unsigned char *)malloc(w*h*3/2);
 
@@ -269,7 +269,7 @@ static int simplest_yuv420_halfy(const char *url, int w, int h,int num)
 static int simplest_yuv420_border(const char *url, int w, int h,int border,int num)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("yuv420p/output_border.yuv","w+");
+	FILE *fp1 = fopen("out/yuv420p/output_border.yuv","w+");
 	
 	unsigned char *pic = (unsigned char *)malloc(w*h*3/2);
 
@@ -430,9 +430,9 @@ static int simplest_yuv420_psnr(const char *url1,const char *url2,int w,int h,in
 static int simplest_rgb24_split(const char *url, int w, int h,int num)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("rgb24/output_r.y","w+");  
-	FILE *fp2 = fopen("rgb24/output_g.y","w+");  
-	FILE *fp3 = fopen("rgb24/output_b.y","w+"); 
+	FILE *fp1 = fopen("out/rgb24/output_r.y","w+");
+	FILE *fp2 = fopen("out/rgb24/output_g.y","w+");
+	FILE *fp3 = fopen("out/rgb24/output_b.y","w+");
 				    
 	unsigned char *pic = (unsigned char *)malloc(w*h*3);
 	
@@ -757,8 +757,8 @@ static int simplest_rgb24_colorbar(int width, int height,const char *url_out)
 static int simplest_pcm16le_split(const char *url)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("pcm/output_l.pcm","w+");
-	FILE *fp2 = fopen("pcm/output_r.pcm","w+");
+	FILE *fp1 = fopen("out/pcm/output_l.pcm","w+");
+	FILE *fp2 = fopen("out/pcm/output_r.pcm","w+");
 	
 	unsigned char *sample = (unsigned char *)malloc(4);
 	
@@ -787,7 +787,7 @@ static int simplest_pcm16le_split(const char *url)
 static int simplest_pcm16le_halfvolumeleft(const char *url)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("pcm/output_halfleft.pcm","w+");
+	FILE *fp1 = fopen("out/pcm/output_halfleft.pcm","w+");
 
 	int cnt = 0;
 	unsigned char *sample = (unsigned char *)malloc(4);
@@ -824,7 +824,7 @@ static int simplest_pcm16le_halfvolumeleft(const char *url)
 static int simplest_pcm16le_doublespeed(const char *url)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("pcm/output_doublespeed.pcm","w+");
+	FILE *fp1 = fopen("out/pcm/output_doublespeed.pcm","w+");
 
 	int cnt = 0;
 	unsigned char *sample = (unsigned char *)malloc(4);
@@ -859,7 +859,7 @@ static int simplest_pcm16le_doublespeed(const char *url)
 static int simplest_pcm16le_to_pcm8(const char *url)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("pcm/output_8.pcm","w+");
+	FILE *fp1 = fopen("out/pcm/output_8.pcm","w+");
 
 	int cnt = 0;
 	unsigned char *sample = (unsigned char *)malloc(4);
@@ -904,8 +904,8 @@ static int simplest_pcm16le_to_pcm8(const char *url)
 static int simplest_pcm16le_cut_singlechannel(const char *url,int start_num,int dur_num)
 {
 	FILE *fp = fopen(url,"r+");
-	FILE *fp1 = fopen("pcm/output_cut.pcm","w+");
-	FILE *fp_stat = fopen("pcm/output_cut.txt","w+");
+	FILE *fp1 = fopen("out/pcm/output_cut.pcm","w+");
+	FILE *fp_stat = fopen("out/pcm/output_cut.txt","w+");
 
 	unsigned char *sample = (unsigned char *)malloc(2);
 	int cnt = 0;
@@ -1809,7 +1809,7 @@ static int simplest_flv_parser(const char *url)
 			    fprintf(myout,"%s",audiotag_str);
 				//if the output file hasn't been opened, open it.
                 if(output_a != 0 && afh == NULL)
-					afh = fopen("flv/output.mp3", "w");
+					afh = fopen("out/flv/output.mp3", "w");
 
 				//TagData - First Byte Data
 				int data_size = tagheader_datasize - 1;
@@ -1899,7 +1899,7 @@ static int simplest_flv_parser(const char *url)
 				if(vfh == NULL && output_v != 0)
 				{
 					//write the flv header (reuse the original file's header) and first previoustagsize
-					vfh = fopen("flv/output.flv", "w");
+					vfh = fopen("out/flv/output.flv", "w");
 					fwrite((char *)&flv,1, sizeof(flv),vfh);
 					//重新定位文件指针到FLV Header末尾
 					fseek(vfh,flv.DataOffset-sizeof(flv),SEEK_CUR);
@@ -2181,7 +2181,7 @@ static int simplest_udp_parser(int port)
 	//FILE *myout=fopen("output_log.txt","wb+");
 	FILE *myout = stdout;
 
-	FILE *fp1 = fopen("udp-rtp/output_dump.ts","w+");
+	FILE *fp1 = fopen("out/udp-rtp/output_dump.ts","w+");
 
 	int serSocket = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
 	if(serSocket ==-1){
@@ -2352,32 +2352,32 @@ static int simplest_udp_parser(int port)
 
 int main(int argc, char* argv[])
 {
-//	  simplest_yuv420_split("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
-//    simplest_yuv444_split("yuv444p/lena_256x256_yuv444p.yuv",256,256,1);
-//    simplest_yuv420_gray("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
-//    simplest_yuv420_halfy("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
-//    simplest_yuv420_border("yuv420p/lena_256x256_yuv420p.yuv",256,256,20,1);
-//    simplest_yuv420_graybar(640,360,0,255,10,"yuv420p/output_graybar_640x360.yuv");
-//	  simplest_yuv420_psnr("yuv420p/lena_256x256_yuv420p.yuv","yuv420p/lena_distort_256x256_yuv420p.yuv",256,256,1);
-//	  simplest_rgb24_split("rgb24/cie1931_500x500.rgb",500,500,1);
-//	  simplest_rgb24_to_bmp("rgb24/lena_256x256_rgb24.rgb",256,256,"rgb24/output_lena.bmp");
-//	  simplest_rgb24_to_yuv420("rgb24/lena_256x256_rgb24.rgb",256,256,1,"rgb24/output_lena_256x256_yuv420p.yuv");
-//	  simplest_rgb24_colorbar(640, 360,"rgb24/colorbar_640x360.rgb");
+	  simplest_yuv420_split("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+      simplest_yuv444_split("yuv444p/lena_256x256_yuv444p.yuv",256,256,1);
+      simplest_yuv420_gray("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+      simplest_yuv420_halfy("yuv420p/lena_256x256_yuv420p.yuv",256,256,1);
+      simplest_yuv420_border("yuv420p/lena_256x256_yuv420p.yuv",256,256,20,1);
+      simplest_yuv420_graybar(640,360,0,255,10,"out/yuv420p/output_graybar_640x360.yuv");
+	  simplest_yuv420_psnr("yuv420p/lena_256x256_yuv420p.yuv","yuv420p/lena_distort_256x256_yuv420p.yuv",256,256,1);
+	  simplest_rgb24_split("rgb24/cie1931_500x500.rgb",500,500,1);
+	  simplest_rgb24_to_bmp("rgb24/lena_256x256_rgb24.rgb",256,256,"out/rgb24/output_lena.bmp");
+	  simplest_rgb24_to_yuv420("rgb24/lena_256x256_rgb24.rgb",256,256,1,"out/rgb24/output_lena_256x256_yuv420p.yuv");
+	  simplest_rgb24_colorbar(640, 360,"rgb24/colorbar_640x360.rgb");
 
-//	  simplest_pcm16le_split("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-//    simplest_pcm16le_halfvolumeleft("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-//    simplest_pcm16le_doublespeed("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-//    simplest_pcm16le_to_pcm8("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
-//    simplest_pcm16le_cut_singlechannel("pcm/drum.pcm",2360,120);
-//    simplest_pcm16le_to_wave("pcm/NocturneNo2inEflat_44.1k_s16le.pcm",2,44100,"pcm/output_nocturne.wav");
+	  simplest_pcm16le_split("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+      simplest_pcm16le_halfvolumeleft("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+      simplest_pcm16le_doublespeed("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+      simplest_pcm16le_to_pcm8("pcm/NocturneNo2inEflat_44.1k_s16le.pcm");
+      simplest_pcm16le_cut_singlechannel("pcm/drum.pcm",2360,120);
+      simplest_pcm16le_to_wave("pcm/NocturneNo2inEflat_44.1k_s16le.pcm",2,44100,"out/pcm/output_nocturne.wav");
 
-//	  simplest_h264_parser("h264/sintel.h264");
+	  simplest_h264_parser("h264/sintel.h264");
 
-//	  simplest_aac_parser("aac/nocturne.aac");
+	  simplest_aac_parser("aac/nocturne.aac");
 
-//    simplest_flv_parser("flv/cuc_ieschool.flv");
+      simplest_flv_parser("flv/cuc_ieschool.flv");
 
-	simplest_udp_parser(8888);
+	  simplest_udp_parser(8888);
 
 	return 0;
 }

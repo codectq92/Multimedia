@@ -45,7 +45,7 @@ int main()
 	//RTMP服务器上流媒体资源URL
 	const char* publicUrl = "rtmp://10.0.142.118:1935/zhongjihao/myflv";
 	//从RTMP服务器拉流
-    testRtmpRecvFlv("log/rtmp_recvflv.log","res/rtmp_recv.flv",publicUrl);
+    testRtmpRecvFlv("log/rtmp_recvflv.log","out/rtmp_recv.flv",publicUrl);
 
 	return 0;
 }
