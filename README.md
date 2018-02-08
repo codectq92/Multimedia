@@ -68,8 +68,8 @@ RTMP流地址为：rtmp://127.0.0.1/live/livestream
 
 
 四、simplest_rtp_h264_example工程
-   实现linux平台下通过RTP实时发送H264碼流，通过播放器mpv Media Player可以实时观看推送过来的H264碼流
+     实现linux平台下通过RTP实时发送H264碼流，通过播放器mpv Media Player可以实时观看推送过来的H264碼流
 
 
 五、AVMediaCodecMP4工程
-  Android平台Camera采集预览nv21格式数据，AudioRecord采集音频pcm数据，使用MediaCodec分别进行h264和AAC硬编码，通过MediaMuxer合成MP4
+      Android平台Camera采集预览nv21格式数据，AudioRecord采集音频pcm数据，使用MediaCodec分别进行h264和AAC硬编码，通过MediaMuxer合成MP4
