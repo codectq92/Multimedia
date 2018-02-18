@@ -26,5 +26,3 @@ Ubuntu16.0.4下播放H264裸流文件
 推流首先经过RTP封装，然后经过UDP封装的MPEG-TS
    ffmpeg -re -i sintel.ts -strict -2 -f rtp_mpegts udp://127.0.0.1:8888
 
-
-
