@@ -57,20 +57,31 @@ vhost __defaultVhost__ {
     done
 
 第六步，观看RTMP流。
-  
-RTMP流地址为：rtmp://127.0.0.1/live/livestream
-
-可以使用VLC观看。
+   RTMP流地址为：rtmp://127.0.0.1/live/livestream   可以使用VLC观看。
 
 
 
 四、simplest_rtp_h264_example工程
-   实现linux平台下通过RTP实时发送H264碼流，通过播放器mpv Media Player可以实时观看推送过来的H264碼流
+    实现linux平台下通过RTP实时发送H264碼流，通过播放器mpv Media Player可以实时观看推送过来的H264碼流
 
 
 五、AVMediaCodecMP4工程
-  Android平台Camera采集预览nv21格式数据，AudioRecord采集音频pcm数据，使用MediaCodec分别进行h264和AAC硬编码，通过MediaMuxer合成MP4
+    Android平台Camera采集预览nv21格式数据，AudioRecord采集音频pcm数据，使用MediaCodec分别进行h264和AAC硬编码，通过MediaMuxer合成MP4
 
+
+六、android_librtmp_project工程
+    将AVC(h264)数据推送到流媒体服务器。实现方法是：
+	1先使用android自带的API采集摄像头数据，然后进行h264编码。
+	2、然后使用ndk开发将编码后的数据通过librtmp发送出去
+
+	编译步骤：
+	   安装ndk版本至少是r14
+	   环境变量ANDROID_NDK_ROOT设置到PAHT中
+	   cd jni/rtmpvedio/polarssl-1.2.14/
+	   执行armeabi_or_v7a_build.sh脚本
+	   cd jni/
+	   执行ndk-build
+	   最后用AndroidStudio编译运行即可
 
 
 
