@@ -36,3 +36,8 @@ make CC=arm-linux-androideabi-gcc APPS=
 make install DESTDIR=$SYSROOT
 
 
+if [ -d "$TOOLCHAIN" ]; then
+	rm -rf "$TOOLCHAIN"
+fi
+
+
