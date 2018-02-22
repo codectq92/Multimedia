@@ -81,7 +81,16 @@ vhost __defaultVhost__ {
 	   执行armeabi_or_v7a_build.sh脚本
 	   cd jni/
 	   执行ndk-build
-	   最后用AndroidStudio编译运行即可
+	运行步骤：
+	   1 将VideoRunnable.java中IP地址192.168.1.103改为srs服务器所在的IP,android客户端ip和srs服务器在同一网络
+	   2 下载srs服务器代码
+	   3 cd srs/trunk
+	   4 bash scripts/build.sh
+	   5 bash scripts/run.sh
+	   6 火狐浏览器打开srs网页客户端 如 http://192.168.1.103:8085
+	   7 在srs网页客户端rtmp地址栏中输入rtmp://192.168.1.103:1935/zhongjihao/myh264
+	   8 最后用AndroidStudio编译运行apk，点击开始即可在srs网页客户端上看到android客户端推送过来的视频
+	   9 bash scripts/stop.sh 结束srs服务器运行
 
 
 
