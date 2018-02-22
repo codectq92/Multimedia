@@ -14,5 +14,3 @@ $(error "You must define SSL before starting")
 endif
 
 include $(subdirs)
-
-
