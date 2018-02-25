@@ -65,7 +65,7 @@ JNIEXPORT jint JNICALL Java_com_android_rtmpvideo_RtmpH264_sendVideoFrame(JNIEnv
         len -= 4;
     } else if (data[2] == 0x01) {/*00 00 01*/
         data += 3;
-        len - 3;
+        len -= 3;
     }
 
     //提取NALU Header中type字段,Nalu头一个字节，type是其后5bit

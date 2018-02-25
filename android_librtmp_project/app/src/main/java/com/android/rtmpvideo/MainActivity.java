@@ -2,11 +2,13 @@ package com.android.rtmpvideo;
 
 import android.Manifest;
 import android.os.Build;
+import android.os.Environment;
 import android.support.v4.content.ContextCompat;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -14,10 +16,10 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, CameraWrapper.CamOpenOverCallback{
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, VideoGather.CamOpenOverCallback{
     private final static String TAG = "MainActivity";
-
     private Button btnStart;
     private SurfaceView mSurfaceView;
     private SurfaceHolder mSurfaceHolder;
@@ -63,17 +65,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             new String[]{permissions[i]}, i);
                 }
             }
-
         }
     }
 
     private void codecToggle() {
         if (isStarted) {
             isStarted = false;
-            CameraWrapper.getInstance().stopRecording();
+            MediaEncoderWrapper.stopAVThread();
         } else {
             isStarted = true;
-            CameraWrapper.getInstance().startRecording();
+            int ret = MediaEncoderWrapper.startAVThread();
+            if (ret == 0) {
+                Toast.makeText(this, "连接RTMP流媒体服务器失败,请检测网络!", Toast.LENGTH_LONG).show();
+                finish();
+            }
         }
         btnStart.setText(isStarted ? "停止" : "开始");
     }
@@ -81,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        CameraWrapper.getInstance().doStopCamera();
+        VideoGather.getInstance().doStopCamera();
     }
 
     @Override
@@ -106,7 +111,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void cameraHasOpened() {
-        CameraWrapper.getInstance().doStartPreview(this, mSurfaceHolder);
+        VideoGather.getInstance().doStartPreview(this, mSurfaceHolder);
     }
 
 }

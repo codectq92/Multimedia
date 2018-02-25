@@ -23,13 +23,12 @@ import static android.hardware.Camera.Parameters.PREVIEW_FPS_MAX_INDEX;
 import static android.hardware.Camera.Parameters.PREVIEW_FPS_MIN_INDEX;
 
 @SuppressLint("NewApi")
-public class CameraWrapper {
+public class VideoGather {
+    private static final String TAG = "CameraWrapper";
     public static  int IMAGE_HEIGHT = 1080;
     public static  int IMAGE_WIDTH = 1920;
     public static  int FRAME_RATE = 30; // 30fps
-    private static final String TAG = "CameraWrapper";
-    private static final boolean DEBUG = true;    // TODO set false on release
-    private static CameraWrapper mCameraWrapper;
+    private static VideoGather mCameraWrapper;
 
     // 定义系统所用的照相机
     private Camera mCamera;
@@ -37,21 +36,20 @@ public class CameraWrapper {
     private Camera.Size previewSize;
     private Camera.Parameters mCameraParamters;
     private boolean mIsPreviewing = false;
-    private volatile boolean isStopRecord = false;
     private CameraPreviewCallback mCameraPreviewCallback;
 
-    private CameraWrapper() {
+    private VideoGather() {
     }
 
     public interface CamOpenOverCallback {
         public void cameraHasOpened();
     }
 
-    public static CameraWrapper getInstance() {
+    public static VideoGather getInstance() {
         if (mCameraWrapper == null) {
-            synchronized (CameraWrapper.class) {
+            synchronized (VideoGather.class) {
                 if (mCameraWrapper == null) {
-                    mCameraWrapper = new CameraWrapper();
+                    mCameraWrapper = new VideoGather();
                 }
             }
         }
@@ -200,16 +198,6 @@ public class CameraWrapper {
         mCamera.setDisplayOrientation(result);
     }
 
-    public void startRecording() {
-        isStopRecord = false;
-        MediaDataPro.startAVThread();
-    }
-
-    public void stopRecording() {
-        isStopRecord = true;
-        MediaDataPro.stopAVThread();
-    }
-
     class CameraPreviewCallback implements Camera.PreviewCallback {
 
         private CameraPreviewCallback() {
@@ -221,8 +209,7 @@ public class CameraWrapper {
             //通过回调,拿到的data数据是原始数据
             //丢给VideoRunnable线程,使用MediaCodec进行h264编码操作
             if(data != null){
-                if(!isStopRecord)
-                    MediaDataPro.addVideoFrameData(data);
+                MediaEncoderWrapper.addVideoFrameData(data);
                 camera.addCallbackBuffer(data);
             }
             else {

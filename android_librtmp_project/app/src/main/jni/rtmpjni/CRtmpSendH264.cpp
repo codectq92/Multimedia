@@ -38,6 +38,7 @@ int CRtmpSendH264::RTMPH264_Connect(const char* url,FILE* logfile)
 	if (RTMP_SetupURL(m_pRtmp,(char*)url) == FALSE)
 	{
 		RTMP_Free(m_pRtmp);
+		m_pRtmp = NULL;
 		return false;
 	}
 
@@ -48,6 +49,7 @@ int CRtmpSendH264::RTMPH264_Connect(const char* url,FILE* logfile)
 	if (RTMP_Connect(m_pRtmp, NULL) == FALSE) 
 	{
 		RTMP_Free(m_pRtmp);
+		m_pRtmp = NULL;
 		return false;
 	} 
 
@@ -56,6 +58,7 @@ int CRtmpSendH264::RTMPH264_Connect(const char* url,FILE* logfile)
 	{
 		RTMP_Close(m_pRtmp);
 		RTMP_Free(m_pRtmp);
+		m_pRtmp = NULL;
 		return false;
 	}
 	return true;

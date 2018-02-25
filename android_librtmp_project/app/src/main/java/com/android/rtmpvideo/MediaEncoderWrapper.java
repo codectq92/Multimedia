@@ -4,42 +4,56 @@ package com.android.rtmpvideo;
  * Created by zhongjihao on 18-1-31.
  */
 
+import android.os.Environment;
 import android.util.Log;
 
-public class MediaDataPro {
-    private final static String TAG = "MediaDataPro";
+public class MediaEncoderWrapper {
+    private final static String TAG = "MediaEncoderWrapper";
+    public static final String rtmpUrl = "rtmp://192.168.1.101:1935/zhongjihao/myh264";
     public static boolean DEBUG = true;
-    private static MediaDataPro mediaPro;
+    private volatile boolean isExit = false;
+    private static MediaEncoderWrapper mediaPro;
 
     //   private AudioRunnable audioThread;
-    private VideoRunnable videoThread;
+    private AvcEncoderRunnable videoThread;
 
 
-    private MediaDataPro() {
-        videoThread = new VideoRunnable(CameraWrapper.IMAGE_WIDTH, CameraWrapper.IMAGE_HEIGHT);
+    private MediaEncoderWrapper() {
+        isExit = false;
+        videoThread = new AvcEncoderRunnable(VideoGather.IMAGE_WIDTH, VideoGather.IMAGE_HEIGHT);
         videoThread.start();
     }
 
-    public static void startAVThread() {
+    public static int startAVThread() {
         if (mediaPro == null) {
-            synchronized (MediaDataPro.class) {
+            synchronized (MediaEncoderWrapper.class) {
                 if (mediaPro == null) {
-                    mediaPro = new MediaDataPro();
+                    mediaPro = new MediaEncoderWrapper();
                 }
             }
         }
+
+        String logPath = Environment
+                .getExternalStorageDirectory()
+                + "/" + "zhongjihao/rtmp.log";
+        if (DEBUG) Log.d(TAG, "====zhongjihao====连接RTMP服务器=====");
+        return RtmpH264.initRtmp(rtmpUrl, logPath);
     }
 
     public static void stopAVThread() {
         if (mediaPro != null) {
+            mediaPro.isExit = true;
             mediaPro.exit();
             mediaPro = null;
         }
+        Log.d(TAG, "====zhongjihao====断开RTMP服务器=====");
+        RtmpH264.stopRtmp();
     }
 
     public static void addVideoFrameData(byte[] data) {
         if (mediaPro != null) {
-            mediaPro.addVideoData(data);
+            if(!mediaPro.isExit)
+                mediaPro.addVideoData(data);
         }
     }
 

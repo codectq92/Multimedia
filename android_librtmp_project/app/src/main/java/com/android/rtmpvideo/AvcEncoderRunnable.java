@@ -15,8 +15,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Vector;
 
-public class VideoRunnable extends Thread {
-    private static final String TAG = "VideoRunnable";
+public class AvcEncoderRunnable extends Thread {
+    private static final String TAG = "AvcEncoderRunnable";
     // parameters for the encoder
     private static final String MIME_TYPE = "video/avc"; // H.264 Advanced Video
     private static final int IFRAME_INTERVAL = 5; // 10 between
@@ -48,12 +48,12 @@ public class VideoRunnable extends Thread {
     //pts时间基数
     private long presentationTimeUs = 0;
 
-    public VideoRunnable(int mWidth, int mHeight) {
+    public AvcEncoderRunnable(int mWidth, int mHeight) {
         this.mWidth = mWidth;
         this.mHeight = mHeight;
         frameBytes = new Vector<byte[]>();
         frameBytes.clear();
-        BIT_RATE = (CameraWrapper.IMAGE_HEIGHT * CameraWrapper.IMAGE_WIDTH * 3 / 2) * 8 * CameraWrapper.FRAME_RATE;
+        BIT_RATE = (VideoGather.IMAGE_HEIGHT * VideoGather.IMAGE_WIDTH * 3 / 2) * 8 * VideoGather.FRAME_RATE;
         prepare();
     }
 
@@ -67,8 +67,9 @@ public class VideoRunnable extends Thread {
                 return colorFormat;
             }
         }
-        if (DEBUG) Log.d(TAG,
-                "=====zhongjihao=======couldn't find a good color format for " + codecInfo.getName()
+
+        Log.d(TAG,
+                "==zhongjihao====couldn't find a good color format for " + codecInfo.getName()
                         + " / " + mimeType);
         return 0; // not reached
     }
@@ -158,7 +159,7 @@ public class VideoRunnable extends Thread {
         //设置比特率
         mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, BIT_RATE);
         //设置帧率
-        mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, CameraWrapper.FRAME_RATE);
+        mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, VideoGather.FRAME_RATE);
         //设置颜色格式
         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         //设置关键帧的时间
@@ -302,11 +303,6 @@ public class VideoRunnable extends Thread {
 
     @Override
     public void run() {
-        if (DEBUG) Log.d(TAG, "====zhongjihao====连接RTMP服务器=====");
-        String logPath = Environment
-                .getExternalStorageDirectory()
-                + "/" + "zhongjihao/rtmp.log";
-        RtmpH264.initRtmp("rtmp://192.168.1.103:1935/zhongjihao/myh264", logPath);
         while (!isExit) {
             if (!isStartCodec) {
                 stopMediaCodec();
@@ -337,8 +333,6 @@ public class VideoRunnable extends Thread {
             }
         }
         stopMediaCodec();
-        if (DEBUG) Log.d(TAG, "====zhongjihao====断开RTMP服务器=====");
-        RtmpH264.stopRtmp();
         if (DEBUG) Log.d(TAG, "=====zhongjihao=========Video 编码线程 退出...");
     }
 
@@ -346,6 +340,6 @@ public class VideoRunnable extends Thread {
      * 计算视频pts,单位微秒
      */
     private long computePresentationTime(long frameIndex) {
-        return 132 + frameIndex * 1000000 / CameraWrapper.FRAME_RATE;
+        return 132 + frameIndex * 1000000 / VideoGather.FRAME_RATE;
     }
 }
