@@ -28,8 +28,8 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-             src/main/jni/rtmpjni/CRtmpSendH264.cpp
-             src/main/jni/com_android_rtmpvideo_RtmpH264.cpp )
+             src/main/jni/rtmpjni/CRtmpWrap.cpp
+             src/main/jni/com_android_rtmpvideo_RtmpJni.cpp )
 
 # Specifies a path to native header files.
 include_directories(src/main/jni/)

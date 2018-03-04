@@ -9,16 +9,14 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.util.Log;
 
-import java.nio.ByteBuffer;
-
 public class AudioGather {
     private static final String TAG = "AudioGather";
     private static AudioGather mAudioGather;
-    public static int audioBufferSize = 1024;
     private AudioRecord audioRecord;
-    private int aChannelCount;
-    private int aSampleRate;
-    private ByteBuffer audioBuf = null;
+    public int aChannelCount;
+    public int aSampleRate;
+    public int audioForamt;
+    private byte[] audioBuf;
 
     private Thread workThread;
     private volatile boolean loop = false;
@@ -39,7 +37,7 @@ public class AudioGather {
 
     }
 
-    public void prepareAudioRecord() {
+    private void prepareAudioRecord() {
         if (audioRecord != null) {
             audioRecord.stop();
             audioRecord.release();
@@ -51,7 +49,7 @@ public class AudioGather {
         try {
             for (int sampleRate : sampleRates) {
                 //编码制式PCM
-                int audioForamt = AudioFormat.ENCODING_PCM_16BIT;
+                audioForamt = AudioFormat.ENCODING_PCM_16BIT;
                 // stereo 立体声,mono单声道
                 int channelConfig = AudioFormat.CHANNEL_CONFIGURATION_STEREO;
 
@@ -66,8 +64,8 @@ public class AudioGather {
                 aSampleRate = sampleRate;
                 aChannelCount = channelConfig == AudioFormat.CHANNEL_CONFIGURATION_STEREO ? 2 : 1;
                 //ByteBuffer分配内存的最大值为4096
-                audioBufferSize = Math.min(4096, min_buffer_size);
-                audioBuf = ByteBuffer.allocateDirect(audioBufferSize);
+                int buffSize =  Math.min(4096, min_buffer_size);
+                audioBuf = new byte[buffSize];
                 Log.d(TAG, "====zhongjihao===aSampleRate: " + aSampleRate + "   aChannelCount: " + aChannelCount + "   min_buffer_size: " + min_buffer_size);
                 break;
             }
@@ -80,6 +78,7 @@ public class AudioGather {
      * 开始录音
      */
     public void start() {
+        prepareAudioRecord();
         workThread = new Thread() {
             @Override
             public void run() {
@@ -87,13 +86,10 @@ public class AudioGather {
                     audioRecord.startRecording();
                 }
                 while (loop && !Thread.interrupted()) {
-                    audioBuf.clear();
                     //读取音频数据到buf
-                    int size = audioRecord.read(audioBuf, audioBufferSize);
+                    int size = audioRecord.read(audioBuf,0,audioBuf.length);
                     if (size > 0) {
                         // set audio data to encoder
-                        audioBuf.position(size);
-                        audioBuf.flip();
                         Log.d(TAG, "======zhongjihao========录音字节数:" + size);
                         if (mCallback != null) {
                             mCallback.audioData(audioBuf);
@@ -110,13 +106,17 @@ public class AudioGather {
 
     public void stop() {
         loop = false;
-        workThread.interrupt();
-        Log.d(TAG, "run: ===zhongjihao====调用stop");
-        audioRecord.stop();
+        if(workThread != null)
+            workThread.interrupt();
+        Log.d(TAG, "run: ===zhongjihao====停止录音======");
+        if(audioRecord != null)
+            audioRecord.stop();
     }
 
     public void release() {
-        audioRecord.release();
+        if(audioRecord != null)
+            audioRecord.release();
+        audioRecord = null;
     }
 
     public void setCallback(Callback callback) {
@@ -124,6 +124,6 @@ public class AudioGather {
     }
 
     public interface Callback {
-        void audioData(ByteBuffer data);
+        public void audioData(byte[] data);
     }
 }

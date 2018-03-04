@@ -71,14 +71,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void codecToggle() {
         if (isStarted) {
             isStarted = false;
-            MediaEncoderWrapper.stopAVThread();
+            MediaEncoderWrapper.getMediaEncWrapInstance().stopAVThread();
         } else {
             isStarted = true;
-            int ret = MediaEncoderWrapper.startAVThread();
-            if (ret == 0) {
+            int ret = MediaEncoderWrapper.getMediaEncWrapInstance().startAVThread();
+//            if (ret == 0) {
                 Toast.makeText(this, "连接RTMP流媒体服务器失败,请检测网络!", Toast.LENGTH_LONG).show();
-                finish();
-            }
+//                finish();
+//            }
         }
         btnStart.setText(isStarted ? "停止" : "开始");
     }
@@ -86,6 +86,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        MediaEncoderWrapper.getMediaEncWrapInstance().stopAVThread();
         VideoGather.getInstance().doStopCamera();
     }
 

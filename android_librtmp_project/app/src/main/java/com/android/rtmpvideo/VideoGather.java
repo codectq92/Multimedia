@@ -38,11 +38,17 @@ public class VideoGather {
     private boolean mIsPreviewing = false;
     private CameraPreviewCallback mCameraPreviewCallback;
 
+    private Callback mCallback;
+
     private VideoGather() {
     }
 
     public interface CamOpenOverCallback {
         public void cameraHasOpened();
+    }
+
+    public interface Callback {
+        public void videoData(byte[] data);
     }
 
     public static VideoGather getInstance() {
@@ -54,6 +60,10 @@ public class VideoGather {
             }
         }
         return mCameraWrapper;
+    }
+
+    public void setCallback(Callback callback) {
+        mCallback = callback;
     }
 
     public void doOpenCamera(CamOpenOverCallback callback) {
@@ -209,7 +219,9 @@ public class VideoGather {
             //通过回调,拿到的data数据是原始数据
             //丢给VideoRunnable线程,使用MediaCodec进行h264编码操作
             if(data != null){
-                MediaEncoderWrapper.addVideoFrameData(data);
+                if(mCallback != null)
+                    mCallback.videoData(data);
+                //MediaEncoderWrapper.addVideoFrameData(data);
                 camera.addCallbackBuffer(data);
             }
             else {

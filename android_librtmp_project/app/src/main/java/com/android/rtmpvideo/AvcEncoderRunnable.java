@@ -8,12 +8,12 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
-import android.os.Environment;
 import android.util.Log;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Vector;
+import java.util.Date;
 
 public class AvcEncoderRunnable extends Thread {
     private static final String TAG = "AvcEncoderRunnable";
@@ -173,6 +173,7 @@ public class AvcEncoderRunnable extends Thread {
         mMediaCodec = MediaCodec.createByCodecName(codecInfo.getName());
         mMediaCodec.configure(mediaFormat, null, null,
                 MediaCodec.CONFIGURE_FLAG_ENCODE);
+    //    MediaEncoderWrapper.getMediaEncWrapInstance().presentationTimeUs = System.currentTimeMillis() * 1000;
         mMediaCodec.start();
 
         isStartCodec = true;
@@ -214,7 +215,8 @@ public class AvcEncoderRunnable extends Thread {
                 inputBuffer.put(rotateYuv420);
 
                 //计算pts，这个值是一定要设置的
-                long pts = computePresentationTime(presentationTimeUs);
+               // long pts = computePresentationTime(presentationTimeUs);
+                long pts = new Date().getTime() * 1000 - MediaEncoderWrapper.getMediaEncWrapInstance().presentationTimeUs;
                 if (isExit) {
                     //结束时，发送结束标志，在编码完成后结束
                     if (DEBUG) Log.d(TAG, "=====zhongjihao======send BUFFER_FLAG_END_OF_STREAM");
@@ -225,7 +227,7 @@ public class AvcEncoderRunnable extends Thread {
                     mMediaCodec.queueInputBuffer(inputBufferIndex, 0, rotateYuv420.length,
                             pts, 0);
                 }
-                presentationTimeUs += 1;
+            //    presentationTimeUs += 1;
             } else {
                 // either all in use, or we timed out during initial setup
                 if (DEBUG) Log.d(TAG, "====zhongjihao=====input buffer not available");
@@ -290,11 +292,11 @@ public class AvcEncoderRunnable extends Thread {
             if (mH264[0] == 0 && mH264[1] == 0 && mH264[2] == 0 && mH264[3] == 1 && mH264[4] == 0x65) {//IDR帧
                 Log.d(TAG, "=====zhongjihao=====IDR帧==========");
                 //推流h264的IDR帧时一定要先推送pps 、sps
-                RtmpH264.sendSpsAndPps(mSpsNalu, mSpsNalu.length, mPpsNalu, mPpsNalu.length);
+                RtmpJni.sendSpsAndPps(mSpsNalu, mSpsNalu.length, mPpsNalu, mPpsNalu.length);
             }
             if(pos > 0){
                 Log.d(TAG, "=====zhongjihao=====NALU 帧大小====pos: "+pos+"   时间戳: "+mBufferInfo.presentationTimeUs / 1000);
-                RtmpH264.sendVideoFrame(mH264, pos, (int)(mBufferInfo.presentationTimeUs / 1000));
+                RtmpJni.sendVideoFrame(mH264, pos, (int)(mBufferInfo.presentationTimeUs / 1000));
             }
         } catch (Throwable t) {
             Log.e(TAG, "========zhongjihao====error: " + t.getMessage());

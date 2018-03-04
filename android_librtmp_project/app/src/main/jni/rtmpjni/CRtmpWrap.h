@@ -1,12 +1,12 @@
 /*************************************************************************
-    > File Name: CRtmpSendH264.h
+    > File Name: CRtmpWrap.h
     > Author: zhongjihao
     > Mail: zhongjihao100@163.com 
     > Created Time: 2018年02月09日 星期五 10时14分30秒
  ************************************************************************/
 
-#ifndef CRTMP_SEND_H264_H
-#define CRTMP_SEND_H264_H
+#ifndef CRTMP_WRAP_H
+#define CRTMP_WRAP_H
 
 #include "../rtmpvedio/librtmpdump/librtmp/rtmp_sys.h"
 #include "../rtmpvedio/librtmpdump/librtmp/log.h"
@@ -17,10 +17,11 @@
 
 
 //本类用于将内存中的H.264数据推送至RTMP流媒体服务器
-class CRtmpSendH264
+class CRtmpWrap
 {
 private:
 	RTMP* m_pRtmp;                   //RTMP协议对象
+	unsigned int mStartTime;         //开始直播时的时间戳
 
 private:
 	/**
@@ -34,15 +35,15 @@ private:
 	int SendPacket(unsigned int nPacketType,unsigned char* data,unsigned int size,unsigned int nTimestamp);
 
 public:
-	CRtmpSendH264();
-	~CRtmpSendH264();
+	CRtmpWrap();
+	~CRtmpWrap();
 	/**
 	 * 初始化并连接到RTMP服务器
 	 * @param url 服务器上对应webapp的地址
 	 * @param logfile log文件
 	 * @成功则返回 1 , 失败则返回 0
 	*/
-	int RTMPH264_Connect(const char* url,FILE* logfile);
+	int RTMPAV_Connect(const char* url,FILE* logfile);
 
 	/**
 	 * 发送H264数据帧
@@ -65,9 +66,26 @@ public:
 	int SendVideoSpsPps(unsigned char* pps,int pps_len,unsigned char* sps,int sps_len);
 
 	/**
+	 * 发送音频关键帧
+	 * @param data 音频关键帧信息
+	 * @param len  音频关键帧信息长度
+	 * @成功则返回 1 , 失败则返回 0
+    */
+	int SendAacSpec(unsigned char* data, int len);
+
+	/**
+     * 发送音频数据
+     * @param data 音频帧信息
+	 * @param len  音频帧信息长度
+	 * @param nTimeStamp 当前帧的时间戳
+	 * @成功则返回 1 , 失败则返回 0
+     */
+	int SendAacData(unsigned char* data, int len,unsigned int nTimeStamp);
+
+	/**
 	 * 断开连接，释放相关的资源
 	*/
-	void RTMPH264_Close();
+	void RTMPAV_Close();
 };
 
 #endif
