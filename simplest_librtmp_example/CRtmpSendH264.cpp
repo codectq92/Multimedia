@@ -453,15 +453,79 @@ int CRtmpSendH264::SendVideoSpsPps(unsigned char* pps,int pps_len,unsigned char*
 	packet->m_body = (char *)packet + RTMP_HEAD_SIZE;
 	body = (unsigned char *)packet->m_body;
 	i = 0;
-	body[i++] = 0x17;
+	/*
+	 * 向RTMP服务器推送视频，需要按照 FLV 的格式进行封包。因此，在我们向服务器推送第一个H264 数据包之前，
+	 * 需要首先推送一个视频 Tag [AVC Sequence Header] 以下简称“视频同步包”。
+	 * 该数据包含的是重要的编码信息，没有它们，解码器将无法解码。AVC sequence header结构如下:
+	 * VIDEODATA
+	 * Field                  Type                       Comment
+	 * FrameType              UB[4]                      1 keyframe （for AVC，a seekable frame）
+                                                         2 inter frame （for AVC，a nonseekable frame）
+                                                         3 disposable inter frame （H.263 only）
+                                                         4 generated keyframe （reserved for server use）
+                                                         5 video info/command frame
+	 * CodecID                UB[4]                      1 JPEG （currently unused）
+	 *                                                   2 Sorenson H.263
+	 *                                                   3 Screen video
+	 *                                                   4 On2 VP6
+	 *                                                   5 On2 VP6 with alpha channel
+	 *                                                   6 Screen video version 2
+	 *                                                   7 AVC
+	 * VideoData             if CodecID ==2              Video frame payload or UI8
+	 *                          H263VIDEOPACKET
+	 *                       if CodecID ==3
+	 *                          SCREENVIDEOPACKET
+	 *                       if CodecID ==4
+	 *                          VP6FLVVIDEOPACKET
+	 *                       if CodecID ==5
+	 *                          VP6FLVALPHAVIDEOPACKET
+	 *                       if CodecID ==6
+	 *                          SCREENV2VIDEOPACKET
+	 *                       if CodecID ==7
+	 *                          AVCVIDEOPACKET
+	 *
+	 * AVCVIDEOPACKET
+	 * Field                 Type                       Comment
+	 * AVCPacketType         UI8                        0: AVC sequence header
+	 *                                                  1: AVC NALU
+	 *                                                  2: AVC end of sequence
+	 * CompositionTime       SI24                       if AVCPacketType == 1
+	 *                                                     Composition time offset
+	 *                                                  else
+	 *                                                     0
+	 * Data                 UI8[n]                      if AVCPacketType == 0
+	 *                                                     AVCDecoderConfigurationRecord
+	 *                                                  else if AVCPacketType == 1
+	 *                                                     One or more NALUs
+	 *                                                  else if AVCPacketType == 2
+	 *                                                     Empty
+	 */
+	body[i++] = 0x17;  //FrameType 和 CodecID
+	//VideoData
+	body[i++] = 0x00;  //AVCPacketType
+        
+	//CompositionTime
+	body[i++] = 0x00;
+	body[i++] = 0x00;
 	body[i++] = 0x00;
 
-	body[i++] = 0x00;
-	body[i++] = 0x00;
-	body[i++] = 0x00;
-
+	/*
+	 *AVCDecoderConfigurationRecord结构，如下
+	 * 长度      字段                                    说明
+	 * 8 bit    configurationVersion                  版本号 1
+	 * 8 bit    AVCProfileIndication                  sps[1]
+	 * 8 bit    profile_compatibility                 sps[2]
+	 * 8 bit    AVCLevelIndication                    sps[3]
+	 * 6 bit    reserved                              111111
+	 * 2 bit    lengthSizeMinusOne                    NALUnitLength的长度-1，一般为3
+	 * 3 bit    reserved                              111
+	 * 5 bit    numOfSequenceParameterSets            sps个数，一般为1
+	 *          sequenceParameterSetNALUnits          (sps_len+sps)的数组，sps_len占2字节,紧接sps数据
+	 * 8 bit    numOfPictureParameterSets             pps个数，一般为1
+	 *          pictureParameterSetNALUnit            (pps_len+pps)的数组，pps_len占2字节,紧接pps数据
+	 */
 	/*AVCDecoderConfigurationRecord*/
-	body[i++] = 0x01;
+	body[i++] = 0x01;      //版本号 1
 	body[i++] = sps[1];
 	body[i++] = sps[2];
 	body[i++] = sps[3];
@@ -469,6 +533,7 @@ int CRtmpSendH264::SendVideoSpsPps(unsigned char* pps,int pps_len,unsigned char*
 
 	/*sps*/
 	body[i++] = 0xe1;
+	//sps长度采用网络字节序存储
 	body[i++] = (sps_len >> 8) & 0xff;
 	body[i++] = sps_len & 0xff;
 	//拷贝sps数据
@@ -477,6 +542,7 @@ int CRtmpSendH264::SendVideoSpsPps(unsigned char* pps,int pps_len,unsigned char*
 
 	/*pps*/
 	body[i++] = 0x01;
+	//pps长度采用网络字节序存储
 	body[i++] = (pps_len >> 8) & 0xff;
 	body[i++] = pps_len & 0xff;
 	//拷贝pps数据
