@@ -1,4 +1,4 @@
-srs流媒体服务器的搭建部署
+srs流媒体服务器的搭建部署：
   第一步，获取SRS。详细参考GIT获取代码
     git clone https://github.com/ossrs/srs cd srs/trunk 
     或者使用git更新已有代码：
