@@ -17,7 +17,7 @@ CRtmpWrap::CRtmpWrap()
 
 CRtmpWrap::~CRtmpWrap()
 {
-
+	RTMPAV_Close();
 }
 
 /**

@@ -13,9 +13,9 @@ public class AudioGather {
     private static final String TAG = "AudioGather";
     private static AudioGather mAudioGather;
     private AudioRecord audioRecord;
-    public int aChannelCount;
-    public int aSampleRate;
-    public int audioForamt;
+    private int aChannelCount;
+    private int aSampleRate;
+    private int pcmForamt;
     private byte[] audioBuf;
 
     private Thread workThread;
@@ -37,7 +37,7 @@ public class AudioGather {
 
     }
 
-    private void prepareAudioRecord() {
+    public void prepareAudioRecord() {
         if (audioRecord != null) {
             audioRecord.stop();
             audioRecord.release();
@@ -48,12 +48,10 @@ public class AudioGather {
         android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO);
         try {
             for (int sampleRate : sampleRates) {
-                //编码制式PCM
-                audioForamt = AudioFormat.ENCODING_PCM_16BIT;
                 // stereo 立体声,mono单声道
                 int channelConfig = AudioFormat.CHANNEL_CONFIGURATION_STEREO;
 
-                final int min_buffer_size = 2 * AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioForamt);
+                final int min_buffer_size = 2 * AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
                 audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT, min_buffer_size);
                 if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
                     audioRecord = null;
@@ -63,6 +61,7 @@ public class AudioGather {
 
                 aSampleRate = sampleRate;
                 aChannelCount = channelConfig == AudioFormat.CHANNEL_CONFIGURATION_STEREO ? 2 : 1;
+                pcmForamt = 16;
                 //ByteBuffer分配内存的最大值为4096
                 int buffSize =  Math.min(4096, min_buffer_size);
                 audioBuf = new byte[buffSize];
@@ -74,11 +73,24 @@ public class AudioGather {
         }
     }
 
+    public int getaChannelCount() {
+        return aChannelCount;
+    }
+
+    public int getaSampleRate() {
+        return aSampleRate;
+    }
+
+    public int getPcmForamt() {
+        return pcmForamt;
+    }
+
     /**
      * 开始录音
      */
-    public void start() {
-        prepareAudioRecord();
+    public void startRecord() {
+        if(loop)
+            return;
         workThread = new Thread() {
             @Override
             public void run() {
@@ -104,13 +116,13 @@ public class AudioGather {
         workThread.start();
     }
 
-    public void stop() {
-        loop = false;
-        if(workThread != null)
-            workThread.interrupt();
+    public void stopRecord() {
         Log.d(TAG, "run: ===zhongjihao====停止录音======");
         if(audioRecord != null)
             audioRecord.stop();
+        loop = false;
+        if(workThread != null)
+            workThread.interrupt();
     }
 
     public void release() {

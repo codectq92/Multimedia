@@ -24,10 +24,10 @@ import static android.hardware.Camera.Parameters.PREVIEW_FPS_MIN_INDEX;
 
 @SuppressLint("NewApi")
 public class VideoGather {
-    private static final String TAG = "CameraWrapper";
-    public static  int IMAGE_HEIGHT = 1080;
-    public static  int IMAGE_WIDTH = 1920;
-    public static  int FRAME_RATE = 30; // 30fps
+    private static final String TAG = "VideoGather";
+    private int preWidth;
+    private int preHeight;
+    private int frameRate;
     private static VideoGather mCameraWrapper;
 
     // 定义系统所用的照相机
@@ -39,12 +39,14 @@ public class VideoGather {
     private CameraPreviewCallback mCameraPreviewCallback;
 
     private Callback mCallback;
+    private CameraOperateCallback cameraCb;
 
     private VideoGather() {
     }
 
-    public interface CamOpenOverCallback {
+    public interface CameraOperateCallback {
         public void cameraHasOpened();
+        public void cameraHasPreview(int width,int height,int fps);
     }
 
     public interface Callback {
@@ -66,8 +68,9 @@ public class VideoGather {
         mCallback = callback;
     }
 
-    public void doOpenCamera(CamOpenOverCallback callback) {
+    public void doOpenCamera(CameraOperateCallback callback) {
         Log.d(TAG, "====zhongjihao====Camera open....");
+        cameraCb = callback;
         if(mCamera != null)
             return;
         if (mCamera == null) {
@@ -78,7 +81,7 @@ public class VideoGather {
             throw new RuntimeException("Unable to open camera");
         }
         Log.d(TAG, "====zhongjihao=====Camera open over....");
-        callback.cameraHasOpened();
+        cameraCb.cameraHasOpened();
     }
 
     public void doStartPreview(Activity activity,SurfaceHolder surfaceHolder) {
@@ -93,9 +96,10 @@ public class VideoGather {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        Log.d(TAG, "=====zhongjihao===doStartPreview()");
         mCamera.startPreview();
         mIsPreviewing = true;
+        Log.d(TAG, "=====zhongjihao===Camera Preview Started...");
+        cameraCb.cameraHasPreview(preWidth,preHeight,frameRate);
     }
 
     public void doStopCamera() {
@@ -137,8 +141,8 @@ public class VideoGather {
                     break;
                 }
             }
-            IMAGE_WIDTH = previewSize.width;
-            IMAGE_HEIGHT = previewSize.height;
+            preWidth = previewSize.width;
+            preHeight = previewSize.height;
             mCameraParamters.setPreviewSize(previewSize.width, previewSize.height);
             mCameraParamters.setFocusMode(FOCUS_MODE_AUTO);
 
@@ -152,7 +156,7 @@ public class VideoGather {
                     defmaxFps = fps[PREVIEW_FPS_MAX_INDEX];
                     //设置相机预览帧率
                     mCameraParamters.setPreviewFpsRange(defminFps,defmaxFps);
-                    FRAME_RATE = defmaxFps;
+                    frameRate = defmaxFps;
                     Log.d(TAG, "=====zhongjihao=====setParameters====find fps:" + Arrays.toString(fps));
                     break;
                 }
@@ -165,7 +169,7 @@ public class VideoGather {
 //                parameters
 //                        .setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
 //            }
-            Log.d(TAG, "=====zhongjihao=====setParameters====IMAGE_WIDTH:" + IMAGE_WIDTH+"   IMAGE_HEIGHT: "+IMAGE_HEIGHT+"  FRAME_RATE: "+FRAME_RATE);
+            Log.d(TAG, "=====zhongjihao=====setParameters====preWidth:" + preWidth+"   preHeight: "+preHeight+"  frameRate: "+frameRate);
             mCamera.setParameters(mCameraParamters);
         }
     }
@@ -209,7 +213,6 @@ public class VideoGather {
     }
 
     class CameraPreviewCallback implements Camera.PreviewCallback {
-
         private CameraPreviewCallback() {
 
         }
@@ -221,7 +224,6 @@ public class VideoGather {
             if(data != null){
                 if(mCallback != null)
                     mCallback.videoData(data);
-                //MediaEncoderWrapper.addVideoFrameData(data);
                 camera.addCallbackBuffer(data);
             }
             else {

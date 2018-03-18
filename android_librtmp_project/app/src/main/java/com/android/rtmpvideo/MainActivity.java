@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
@@ -18,14 +19,15 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, VideoGather.CamOpenOverCallback{
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, VideoGather.CameraOperateCallback{
     private final static String TAG = "MainActivity";
     private Button btnStart;
     private SurfaceView mSurfaceView;
     private SurfaceHolder mSurfaceHolder;
     private SurfacePreview mSurfacePreview;
-
+    private MediaPublisher mediaPublisher;
     private boolean isStarted;
+    private static final String rtmpUrl = "rtmp://192.168.1.101:1935/zhongjihao/myh264";
 
     // 要申请的权限
     private String[] permissions = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA,
@@ -56,29 +58,52 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         // 版本判断。当手机系统大于 23 时，才有必要去判断权限是否获取
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // 检查该权限是否已经获取
+            boolean permission = false;
             for (int i = 0; i < permissions.length; i++) {
                 int result = ContextCompat.checkSelfPermission(this, permissions[i]);
                 // 权限是否已经 授权 GRANTED---授权  DINIED---拒绝
                 if (result != PackageManager.PERMISSION_GRANTED) {
-                    // 如果没有授予该权限，就去提示用户请求
-                    ActivityCompat.requestPermissions(this,
-                            new String[]{permissions[i]}, i);
-                }
+                    permission = false;
+                    break;
+                } else
+                    permission = true;
             }
+            if(!permission){
+                // 如果没有授予权限，就去提示用户请求
+                ActivityCompat.requestPermissions(this,
+                        permissions, 100);
+            }
+
         }
+        String logPath = Environment
+                .getExternalStorageDirectory()
+                + "/" + "zhongjihao/rtmp.log";
+        mediaPublisher = MediaPublisher.newInstance(rtmpUrl,logPath);
+        mediaPublisher.initMediaPublish();
     }
 
     private void codecToggle() {
         if (isStarted) {
             isStarted = false;
-            MediaEncoderWrapper.getMediaEncWrapInstance().stopAVThread();
+            //停止音频采集
+            mediaPublisher.stopAudioGather();
+            //停止编码
+            mediaPublisher. stopEncoder();
+            //释放编码器
+            mediaPublisher.release();
+            //停止发布
+            mediaPublisher.stopRtmpPublish();
         } else {
             isStarted = true;
-            int ret = MediaEncoderWrapper.getMediaEncWrapInstance().startAVThread();
-//            if (ret == 0) {
-                Toast.makeText(this, "连接RTMP流媒体服务器失败,请检测网络!", Toast.LENGTH_LONG).show();
-//                finish();
-//            }
+//            //采集音频
+//            mediaPublisher.startAudioGather();
+//            //初始化音频编码器
+//            mediaPublisher.initAudioEncoder();
+            //启动编码
+            mediaPublisher.startEncoder();
+            //发布
+            mediaPublisher.startRtmpPublish();
+
         }
         btnStart.setText(isStarted ? "停止" : "开始");
     }
@@ -86,7 +111,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        MediaEncoderWrapper.getMediaEncWrapInstance().stopAVThread();
+        if(isStarted){
+            isStarted = false;
+            //停止音频采集
+            mediaPublisher.stopAudioGather();
+            //停止编码
+            mediaPublisher. stopEncoder();
+            //释放编码器
+            mediaPublisher.release();
+            //停止发布
+            mediaPublisher.stopRtmpPublish();
+        }
+        mediaPublisher = null;
         VideoGather.getInstance().doStopCamera();
     }
 
@@ -114,5 +150,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void cameraHasOpened() {
         VideoGather.getInstance().doStartPreview(this, mSurfaceHolder);
     }
+
+    @Override
+    public void cameraHasPreview(int width,int height,int fps) {
+        //初始化视频编码器
+        mediaPublisher.initVideoEncoder(width,height,fps);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == 100
+                && permissions.length == 3
+                && permissions[0].equals(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                && permissions[1].equals(Manifest.permission.CAMERA)
+                && permissions[2].equals(Manifest.permission.RECORD_AUDIO)
+                && grantResults[0] ==PackageManager.PERMISSION_GRANTED
+                && grantResults[1] == PackageManager.PERMISSION_GRANTED
+                && grantResults[2] ==PackageManager.PERMISSION_GRANTED
+                ) {
+
+        }
+    }
+
 
 }

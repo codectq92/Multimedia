@@ -13,15 +13,15 @@ public class RtmpJni {
         Log.d("RtmpJni", "====zhongjihao=====add lib RTMP end===");
     }
 
-    public static final native int initRtmp(String url, String logpath);
+    public static final native long initRtmp(String url, String logpath);
 
-    public static final native int sendSpsAndPps(byte[] sps, int spsLen, byte[] pps, int ppsLen);
+    public static final native int sendSpsAndPps(long cptr,byte[] sps, int spsLen, byte[] pps, int ppsLen);
 
-    public static final native int sendVideoFrame(byte[] frame, int len, int timestamp);
+    public static final native int sendVideoFrame(long cptr,byte[] frame, int len, int timestamp);
 
-    public static final native int sendAacSpec(byte[] data, int len);
+    public static final native int sendAacSpec(long cptr,byte[] data, int len);
 
-    public static final native int sendAacData(byte[] data, int len, int timestamp);
+    public static final native int sendAacData(long cptr,byte[] data, int len, int timestamp);
 
-    public static final native int stopRtmp();
+    public static final native int stopRtmp(long cptr);
 }

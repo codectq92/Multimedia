@@ -8,9 +8,9 @@ import android.util.Log;
 
 public class SurfacePreview  implements SurfaceHolder.Callback{
     private final static String TAG = "SurfacePreview";
-    private VideoGather.CamOpenOverCallback mCallback;
+    private VideoGather.CameraOperateCallback mCallback;
 
-    public SurfacePreview(VideoGather.CamOpenOverCallback cb){
+    public SurfacePreview(VideoGather.CameraOperateCallback cb){
         mCallback = cb;
     }
 
