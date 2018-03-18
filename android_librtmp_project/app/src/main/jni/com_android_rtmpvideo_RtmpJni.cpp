@@ -104,11 +104,6 @@ JNIEXPORT jint JNICALL Java_com_android_rtmpvideo_RtmpJni_sendAacSpec(JNIEnv* en
 
 JNIEXPORT jint JNICALL Java_com_android_rtmpvideo_RtmpJni_sendAacData(JNIEnv* env, jclass jcls, jlong cptr,jbyteArray jaccFrame, jint jlen, jint jtimestamp)
 {
-    /*
-     * 直播流的时间戳不论音频还是视频，在整体时间线上应当呈现递增趋势。如果时间戳计算方法是按照音视频分开计算，那么音频时戳和视频时戳可能并不是在一条时间线上，
-     * 这就有可能出现音频时戳在某一个时间点比对应的视频时戳小， 在某一个时间点又跳变到比对应的视频时戳大，导致播放端无法对齐。
-     * 目前采用的时间戳为底层发送RTMP包的时间，不区分音频流还是视频流，统一使用即将发送RTMP包的系统时间作为该包的时间戳。
-     */
     ALOGD("%s: E: ====zhongjihao====RTMP send audio Aac Data====len: %d",__FUNCTION__,(int)jlen);
     jbyte* accFrame = env->GetByteArrayElements(jaccFrame, NULL);
     unsigned  char* accFrameData = (unsigned char*)accFrame;

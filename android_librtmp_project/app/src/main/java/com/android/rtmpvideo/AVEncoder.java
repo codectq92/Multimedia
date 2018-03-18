@@ -58,9 +58,11 @@ public class AVEncoder {
     private volatile boolean aEncoderEnd = false;
     private LinkedBlockingQueue<byte[]> audioQueue;
 
-    /**
-     * previous presentationTimeUs for writing
-     */
+    /*
+    * 直播流的时间戳不论音频还是视频，在整体时间线上应当呈现递增趋势。如果时间戳计算方法是按照音视频分开计算，那么音频时戳和视频时戳可能并不是在一条时间线上，
+    * 这就有可能出现音频时戳在某一个时间点比对应的视频时戳小， 在某一个时间点又跳变到比对应的视频时戳大，导致播放端无法对齐。
+    * 目前采用的时间戳以发送视频SPS帧为基础，不区分音频流还是视频流，统一使用即将发送RTMP包的系统时间作为该包的时间戳。
+    */
     private long presentationTimeUs;
     private final int TIMEOUT_USEC = 10000;
     private Callback mCallback;
@@ -226,7 +228,7 @@ public class AVEncoder {
      */
     public void start() {
         startAudioEncode();
-    //    startVideoEncode();
+        startVideoEncode();
     }
 
     /**
@@ -234,7 +236,7 @@ public class AVEncoder {
      */
     public void stop() {
         stopAudioEncode();
-     //   stopVideoEncode();
+        stopVideoEncode();
     }
 
     /**
@@ -242,7 +244,7 @@ public class AVEncoder {
      */
     public void release() {
         releaseAudioEncoder();
-     //   releaseVideoEncoder();
+        releaseVideoEncoder();
     }
 
     private void startVideoEncode(){
@@ -562,22 +564,12 @@ public class AVEncoder {
             byte[] bytes = new byte[2];
             bb.get(bytes);
             Log.d(TAG, "======zhongjihao====bytes[0]: " + bytes[0] + "    bytes[1]: " + bytes[1]);
-            // RtmpJni.sendAacSpec(bytes, 2);
             if (null != mCallback) {
                 mCallback.outputAudioSpecConfig(bytes, 2);
             }
         } else {
             byte[] bytes = new byte[aBufferInfo.size];
             bb.get(bytes);
-            if(aBufferInfo.size >=7){
-                Log.d(TAG, "======zhongjihao====bytes[0]: " + bytes[0] + "   bytes[1]: " + bytes[1]
-                        + "   bytes[2]: " + bytes[2]
-                        + "    bytes[3]: " + bytes[3]
-                        + "    bytes[4]: " + bytes[4]
-                        + "    bytes[5]: " + bytes[5]
-                        + "    bytes[6]: " + bytes[6]);
-            }
-            //  RtmpJni.sendAacData(bytes, bytes.length, (int) aBufferInfo.presentationTimeUs / 1000);
             if (null != mCallback) {
                 mCallback.outputAudioData(bytes, bytes.length, (int) aBufferInfo.presentationTimeUs / 1000);
             }

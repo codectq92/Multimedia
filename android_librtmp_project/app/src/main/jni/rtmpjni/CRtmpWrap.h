@@ -21,7 +21,6 @@ class CRtmpWrap
 {
 private:
 	RTMP* m_pRtmp;                   //RTMP协议对象
-	unsigned int mStartTime;         //开始直播时的时间戳
 
 private:
 	/**

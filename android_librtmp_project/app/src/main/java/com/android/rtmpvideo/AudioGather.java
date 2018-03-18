@@ -102,7 +102,7 @@ public class AudioGather {
                     int size = audioRecord.read(audioBuf,0,audioBuf.length);
                     if (size > 0) {
                         // set audio data to encoder
-                        Log.d(TAG, "======zhongjihao========录音字节数:" + size);
+                       // Log.d(TAG, "======zhongjihao========录音字节数:" + size);
                         if (mCallback != null) {
                             mCallback.audioData(audioBuf);
                         }
