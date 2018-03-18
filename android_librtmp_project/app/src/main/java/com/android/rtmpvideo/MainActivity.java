@@ -88,9 +88,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             //停止音频采集
             mediaPublisher.stopAudioGather();
             //停止编码
-            mediaPublisher. stopEncoder();
-            //释放编码器
-            mediaPublisher.release();
+            mediaPublisher.stopEncoder();
             //停止发布
             mediaPublisher.stopRtmpPublish();
         } else {
@@ -116,12 +114,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             //停止音频采集
             mediaPublisher.stopAudioGather();
             //停止编码
-            mediaPublisher. stopEncoder();
-            //释放编码器
-            mediaPublisher.release();
+            mediaPublisher.stopEncoder();
             //停止发布
             mediaPublisher.stopRtmpPublish();
         }
+        //释放编码器
+        mediaPublisher.release();
         mediaPublisher = null;
         VideoGather.getInstance().doStopCamera();
     }

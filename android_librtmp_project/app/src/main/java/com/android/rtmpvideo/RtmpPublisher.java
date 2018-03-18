@@ -37,8 +37,8 @@ public class RtmpPublisher {
     }
 
     public void sendAVCFrame(final byte[] frame, final int len, final int timestamp){
-//        if(timestamp - timeOffset < 0)
-//            return;
+        if(timestamp - timeOffset < 0)
+            return;
         RtmpJni.sendVideoFrame(cPtr,frame, len, timestamp);
     }
 

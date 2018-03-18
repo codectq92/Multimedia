@@ -25,9 +25,7 @@ public class AVEncoder {
     // parameters for the encoder
     private static final String VIDEO_MIME_TYPE = "video/avc"; // H.264 Advanced Video
     // I-frames
-    private static final int IFRAME_INTERVAL = 1; // 10 between
-    //保存h264码流
-    private byte[] mH264;
+    private static final int IFRAME_INTERVAL = 5; // 10 between
     //保存sps帧
     private byte[] mSpsNalu;
     //保存pps帧
@@ -40,10 +38,12 @@ public class AVEncoder {
     private int mHeight;
     private int mFps;
     private MediaCodec vEncoder;
+    private MediaFormat videoFormat;
     private int mColorFormat;
     private MediaCodec.BufferInfo vBufferInfo;
     private Thread videoEncoderThread;
     private volatile boolean videoEncoderLoop = false;
+    private volatile boolean vEncoderEnd = false;
     private LinkedBlockingQueue<byte[]> videoQueue;
 
     ///////////////////AUDIO/////////////////////////////////
@@ -123,8 +123,6 @@ public class AVEncoder {
         this.mHeight = height;
         mFps = fps;
         videoQueue = new LinkedBlockingQueue<>();
-        int bitrate = (mWidth * mHeight * 3 / 2) * 8 * fps;
-        mH264 = new byte[getYuvBuffer(mWidth, mHeight)];
 //        rotateYuv420 = new byte[this.mWidth * this.mHeight * 3 / 2];
 //        yuv420 = new byte[this.mWidth * this.mHeight * 3 / 2];
         yuv420 = new byte[getYuvBuffer(mWidth, mHeight)];
@@ -145,12 +143,14 @@ public class AVEncoder {
         Log.d(TAG, "=====zhongjihao====found colorFormat: " + mColorFormat);
         //根据MIME创建MediaFormat
         // sensor出来的是逆时针旋转90度的数据，hal层没有做旋转导致APP显示和编码需要自己做顺时针旋转90,这样看到的图像才是正常的
-        MediaFormat videoFormat = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE,
+        videoFormat = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE,
                 this.mHeight, this.mWidth);
-        //设置比特率
-        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+        int bitrate = (mWidth * mHeight * 3 / 2) * 8 * fps;
+        //设置比特率,由于Camera帧率太高，将编码比特率值设为bitrate，或将编码帧率设为Camera实际帧率mFps，
+        // 都会导致MediaCodec调用configure失败
+        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, 640000);
         //设置帧率
-        videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
+        videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
         //设置颜色格式
         videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         //设置关键帧的时间
@@ -169,13 +169,10 @@ public class AVEncoder {
             throw new RuntimeException("===zhongjihao===初始化视频编码器失败", e);
         }
         Log.d(TAG, String.format("=====zhongjihao=====编码器:%s创建完成", vEncoder.getName()));
-        vEncoder.configure(videoFormat, null, null,
-                MediaCodec.CONFIGURE_FLAG_ENCODE);
     }
 
-
     private int selectColorFormat(MediaCodecInfo codecInfo,
-                                         String mimeType) {
+                                  String mimeType) {
         MediaCodecInfo.CodecCapabilities capabilities = codecInfo
                 .getCapabilitiesForType(mimeType);
         for (int i = 0; i < capabilities.colorFormats.length; i++) {
@@ -260,6 +257,9 @@ public class AVEncoder {
             public void run() {
                 Log.d(TAG, "===zhongjihao=====Video 编码线程 启动...");
                 presentationTimeUs = System.currentTimeMillis() * 1000;
+                vEncoderEnd = false;
+                vEncoder.configure(videoFormat, null, null,
+                        MediaCodec.CONFIGURE_FLAG_ENCODE);
                 vEncoder.start();
                 while (videoEncoderLoop && !Thread.interrupted()) {
                     try {
@@ -272,6 +272,9 @@ public class AVEncoder {
                         break;
                     }
                 }
+                vEncoder.stop();
+                mSpsNalu = null;
+                mPpsNalu = null;
                 videoQueue.clear();
                 Log.d(TAG, "=====zhongjihao======Video 编码线程 退出...");
             }
@@ -282,9 +285,7 @@ public class AVEncoder {
 
     private void stopVideoEncode() {
         Log.d(TAG, "======zhongjihao======stop video 编码...");
-        videoEncoderLoop = false;
-        videoEncoderThread.interrupt();
-        vEncoder.stop();
+        vEncoderEnd = true;
     }
 
     /**
@@ -376,9 +377,7 @@ public class AVEncoder {
         return ySize + uvSize * 2;
     }
 
-    private  int pos = 0;
     private void encodeVideoData(byte[] input) {
-        pos = 0;
         if(mColorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar){
             //nv21格式转为nv12格式
             Yuv420POperate.NV21ToNV12(input,yuv420,mWidth,mHeight);
@@ -400,10 +399,11 @@ public class AVEncoder {
                 inputBuffer.put(rotateYuv420);
 
                 //计算pts，这个值是一定要设置的
-                long pts = new Date().getTime() * 1000 - presentationTimeUs;
-                if (!videoEncoderLoop) {
+               // long pts = new Date().getTime() * 1000 - presentationTimeUs;
+                long pts = System.currentTimeMillis() * 1000 -  presentationTimeUs;
+                if (vEncoderEnd) {
                     //结束时，发送结束标志，在编码完成后结束
-                    if (DEBUG) Log.d(TAG, "=====zhongjihao======send BUFFER_FLAG_END_OF_STREAM");
+                    if (DEBUG) Log.d(TAG, "=====zhongjihao===send Video Encoder BUFFER_FLAG_END_OF_STREAM====");
                     vEncoder.queueInputBuffer(inputBufferIndex, 0, rotateYuv420.length,
                             pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 } else {
@@ -435,22 +435,18 @@ public class AVEncoder {
                     //sps序列参数集，即0x67 pps图像参数集，即0x68，MediaCodec编码输出的头两个NALU即为sps和pps
                     //并且在h264码流的开始两帧即为sps和pps，在这里MediaCodec将sps和pps作为一个buffer输出。
                     if (mSpsNalu != null && mPpsNalu != null) {
-                         System.arraycopy(outData, 0, mH264, pos, outData.length);
-                         pos += outData.length;
-
                         int naluType = outData[4] & 0x1f;
                         Log.d(TAG, "===zhongjihao===AVC Frame===data: " + outData[0] + " ," + outData[1] + " ," + outData[2] + " ," + outData[3] + "  ," + outData[4] + "  len: " + outData.length + "    AVC帧类型: " + naluType + "   时间戳: " + vBufferInfo.presentationTimeUs / 1000);
 
-                        if (naluType == 0x05) {//IDR
+                        if (naluType == 0x05 || naluType == 0x01) {//IDR SLICE
 //                            if (null != mCallback) {
 //                                Log.d(TAG, "=====zhongjihao=====SPS PPS帧=====时间戳: " + vBufferInfo.presentationTimeUs / 1000);
 //                                mCallback.outputVideoSpsPps(mSpsNalu, mSpsNalu.length, mPpsNalu, mPpsNalu.length, (int) (vBufferInfo.presentationTimeUs / 1000));
 //                            }
                         }
-//                        if (null != mCallback) {
-//                            mCallback.outputVideoFrame(outData, outData.length, (int) (vBufferInfo.presentationTimeUs / 1000));
-//                        }
-                        //  RtmpJni.sendVideoFrame(mH264, pos, (int)(mBufferInfo.presentationTimeUs / 1000));
+                        if (null != mCallback && !vEncoderEnd) {
+                            mCallback.outputVideoFrame(outData, outData.length, (int) (vBufferInfo.presentationTimeUs / 1000));
+                        }
                     } else {
                         //保存pps sps 即h264码流开始两帧，保存起来后面用
                         ByteBuffer spsPpsBuffer = ByteBuffer.wrap(outData);
@@ -470,7 +466,7 @@ public class AVEncoder {
                                 Log.d(TAG, "=====zhongjihao===2==sps==pps==:" + outData[i]);
                             }
                             Log.d(TAG, "=====zhongjihao====3==sps==pps==:" + outData.length);
-                            if (null != mCallback) {
+                            if (null != mCallback && !vEncoderEnd) {
                                 Log.d(TAG, "=====zhongjihao=====SPS PPS帧=====时间戳: " + vBufferInfo.presentationTimeUs / 1000);
                                 mCallback.outputVideoSpsPps(mSpsNalu, mSpsNalu.length, mPpsNalu, mPpsNalu.length, (int) (vBufferInfo.presentationTimeUs / 1000));
                             }
@@ -483,27 +479,11 @@ public class AVEncoder {
                 outputBufferIndex = vEncoder.dequeueOutputBuffer(vBufferInfo, 0);
                 //编码结束的标志
                 if ((vBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                    Log.d(TAG, "=====zhongjihao=====Recv Video Encoder===BUFFER_FLAG_END_OF_STREAM=====" );
+                    videoEncoderLoop = false;
+                    videoEncoderThread.interrupt();
                     return;
                 }
-            }
-
-            int naluType = mH264[4] & 0x1f;
-         //   Log.d(TAG, "===zhongjihao===AVC Frame===data: " + outData[0] + " ," + outData[1] + " ," + outData[2] + " ," + outData[3] + "  ," + outData[4] + "  len: " + outData.length + "    AVC帧类型: " + naluType + "   时间戳: " + vBufferInfo.presentationTimeUs / 1000);
-
-            if (naluType == 0x05) {//IDR
-                if (null != mCallback) {
-                    Log.d(TAG, "=====zhongjihao=====SPS PPS帧=====时间戳: " + vBufferInfo.presentationTimeUs / 1000);
-                    mCallback.outputVideoSpsPps(mSpsNalu, mSpsNalu.length, mPpsNalu, mPpsNalu.length, (int) (vBufferInfo.presentationTimeUs / 1000));
-                }
-            }
-
-            if(pos > 0){
-                Log.d(TAG, "=====zhongjihao=====NALU 帧大小====pos: "+pos+"   时间戳: "+vBufferInfo.presentationTimeUs / 1000);
-                //  RtmpJni.sendVideoFrame(mH264, pos, (int)(mBufferInfo.presentationTimeUs / 1000));
-                if (null != mCallback) {
-                    mCallback.outputVideoFrame(mH264, pos, (int)(vBufferInfo.presentationTimeUs / 1000));
-                }
-                pos = 0;
             }
         } catch (Throwable t) {
             Log.e(TAG, "====zhongjihao=====encodeVideoData=====error: " + t.getMessage());

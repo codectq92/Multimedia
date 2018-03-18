@@ -147,20 +147,20 @@ public class VideoGather {
             mCameraParamters.setFocusMode(FOCUS_MODE_AUTO);
 
             //set fps range.
-            int defminFps = 5;
-            int defmaxFps = 30;
+            int defminFps = 0;
+            int defmaxFps = 0;
             List<int[]> supportedPreviewFpsRange = mCameraParamters.getSupportedPreviewFpsRange();
             for (int[] fps : supportedPreviewFpsRange) {
-                if (fps[PREVIEW_FPS_MAX_INDEX] <= defmaxFps && fps[PREVIEW_FPS_MIN_INDEX] >= defminFps) {
+                Log.d(TAG, "=====zhongjihao=====setParameters====find fps:" + Arrays.toString(fps));
+                if (defminFps <= fps[PREVIEW_FPS_MIN_INDEX] && defmaxFps <= fps[PREVIEW_FPS_MAX_INDEX]) {
                     defminFps = fps[PREVIEW_FPS_MIN_INDEX];
                     defmaxFps = fps[PREVIEW_FPS_MAX_INDEX];
-                    //设置相机预览帧率
-                    mCameraParamters.setPreviewFpsRange(defminFps,defmaxFps);
-                    frameRate = defmaxFps;
-                    Log.d(TAG, "=====zhongjihao=====setParameters====find fps:" + Arrays.toString(fps));
-                    break;
                 }
             }
+            //设置相机预览帧率
+            Log.d(TAG, "=====zhongjihao=====setParameters====defminFps:" + defminFps+"    defmaxFps: "+defmaxFps);
+            mCameraParamters.setPreviewFpsRange(defminFps,defmaxFps);
+            frameRate = defmaxFps;
             mCameraPreviewCallback = new CameraPreviewCallback();
             mCamera.addCallbackBuffer(new byte[calculateLength(ImageFormat.NV21)]);
             mCamera.setPreviewCallbackWithBuffer(mCameraPreviewCallback);

@@ -132,10 +132,6 @@ public class MediaPublisher {
                 Log.d(TAG, "====zhongjihao====停止发布=====");
                 mRtmpPublisher.stopRtmpPublish();
                 isPublish = false;
-                loop = false;
-                if (workThread != null)
-                    workThread.interrupt();
-                workThread = null;
             }
         };
 
@@ -160,9 +156,7 @@ public class MediaPublisher {
         mVideoGather.setCallback(new VideoGather.Callback() {
             @Override
             public void videoData(byte[] data) {
-                if (isPublish) {
                     mAVEncoder.putVideoData(data);
-                }
             }
         });
 
