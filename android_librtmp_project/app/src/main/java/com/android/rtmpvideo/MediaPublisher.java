@@ -20,7 +20,7 @@ public class MediaPublisher {
     private AVEncoder mAVEncoder;
 
     private RtmpPublisher mRtmpPublisher;
-    public boolean isPublish;
+    private boolean isPublish;
 
     private volatile boolean loop;
 
@@ -156,16 +156,14 @@ public class MediaPublisher {
         mVideoGather.setCallback(new VideoGather.Callback() {
             @Override
             public void videoData(byte[] data) {
-                    mAVEncoder.putVideoData(data);
+                mAVEncoder.putVideoData(data);
             }
         });
 
         mAudioGather.setCallback(new AudioGather.Callback() {
             @Override
             public void audioData(byte[] data) {
-                if (isPublish) {
-                    mAVEncoder.putAudioData(data);
-                }
+                mAVEncoder.putAudioData(data);
             }
         });
 

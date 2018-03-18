@@ -85,18 +85,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void codecToggle() {
         if (isStarted) {
             isStarted = false;
+            //停止编码 先要停止编码，然后停止采集
+            mediaPublisher.stopEncoder();
             //停止音频采集
             mediaPublisher.stopAudioGather();
-            //停止编码
-            mediaPublisher.stopEncoder();
             //停止发布
             mediaPublisher.stopRtmpPublish();
         } else {
             isStarted = true;
-//            //采集音频
-//            mediaPublisher.startAudioGather();
-//            //初始化音频编码器
-//            mediaPublisher.initAudioEncoder();
+            //采集音频
+            mediaPublisher.startAudioGather();
+            //初始化音频编码器
+            mediaPublisher.initAudioEncoder();
             //启动编码
             mediaPublisher.startEncoder();
             //发布
@@ -111,10 +111,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onDestroy();
         if(isStarted){
             isStarted = false;
+            //停止编码 先要停止编码，然后停止采集
+            mediaPublisher.stopEncoder();
             //停止音频采集
             mediaPublisher.stopAudioGather();
-            //停止编码
-            mediaPublisher.stopEncoder();
             //停止发布
             mediaPublisher.stopRtmpPublish();
         }

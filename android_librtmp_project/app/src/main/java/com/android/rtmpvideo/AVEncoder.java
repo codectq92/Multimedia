@@ -52,8 +52,10 @@ public class AVEncoder {
     private MediaCodec aEncoder;                // API >= 16(Android4.1.2)
     private MediaCodec.BufferInfo aBufferInfo;        // API >= 16(Android4.1.2)
     private MediaCodecInfo audioCodecInfo;
+    private MediaFormat audioFormat;
     private Thread audioEncoderThread;
     private volatile boolean audioEncoderLoop = false;
+    private volatile boolean aEncoderEnd = false;
     private LinkedBlockingQueue<byte[]> audioQueue;
 
     /**
@@ -96,7 +98,7 @@ public class AVEncoder {
             return;
         }
         Log.d(TAG, "===zhongjihao===selected codec: " + audioCodecInfo.getName());
-        MediaFormat audioFormat = MediaFormat.createAudioFormat(AUDIO_MIME_TYPE, sampleRate, chanelCount);
+        audioFormat = MediaFormat.createAudioFormat(AUDIO_MIME_TYPE, sampleRate, chanelCount);
         audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
         audioFormat.setInteger(MediaFormat.KEY_CHANNEL_MASK, AudioFormat.CHANNEL_IN_STEREO);//CHANNEL_IN_STEREO 立体声
         int bitRate = sampleRate * pcmFormat * chanelCount;
@@ -115,7 +117,7 @@ public class AVEncoder {
             throw new RuntimeException("===zhongjihao===初始化音频编码器失败", e);
         }
         Log.d(TAG, String.format("=====zhongjihao=====编码器:%s创建完成", aEncoder.getName()));
-        aEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+       // aEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
     }
 
     public void initVideoEncoder(int width, int height,int fps) {
@@ -223,24 +225,24 @@ public class AVEncoder {
      * 开始
      */
     public void start() {
-    //    startAudioEncode();
-        startVideoEncode();
+        startAudioEncode();
+    //    startVideoEncode();
     }
 
     /**
      * 停止
      */
     public void stop() {
-     //   stopAudioEncode();
-        stopVideoEncode();
+        stopAudioEncode();
+     //   stopVideoEncode();
     }
 
     /**
      * 释放
      */
     public void release() {
-     //   releaseAudioEncoder();
-        releaseVideoEncoder();
+        releaseAudioEncoder();
+     //   releaseVideoEncoder();
     }
 
     private void startVideoEncode(){
@@ -311,6 +313,9 @@ public class AVEncoder {
             public void run() {
                 Log.d(TAG, "===zhongjihao=====Audio 编码线程 启动...");
                 presentationTimeUs = System.currentTimeMillis() * 1000;
+                aEncoderEnd = false;
+                aEncoder.configure(audioFormat, null, null,
+                        MediaCodec.CONFIGURE_FLAG_ENCODE);
                 aEncoder.start();
                 while (audioEncoderLoop && !Thread.interrupted()) {
                     try {
@@ -321,6 +326,7 @@ public class AVEncoder {
                         break;
                     }
                 }
+                aEncoder.stop();
                 audioQueue.clear();
                 Log.d(TAG, "=====zhongjihao======Audio 编码线程 退出...");
             }
@@ -331,9 +337,7 @@ public class AVEncoder {
 
     private void stopAudioEncode() {
         Log.d(TAG, "======zhongjihao======stop Audio 编码...");
-        audioEncoderLoop = false;
-        audioEncoderThread.interrupt();
-        aEncoder.stop();
+        aEncoderEnd = true;
     }
 
     private void releaseAudioEncoder() {
@@ -403,7 +407,7 @@ public class AVEncoder {
                 long pts = System.currentTimeMillis() * 1000 -  presentationTimeUs;
                 if (vEncoderEnd) {
                     //结束时，发送结束标志，在编码完成后结束
-                    if (DEBUG) Log.d(TAG, "=====zhongjihao===send Video Encoder BUFFER_FLAG_END_OF_STREAM====");
+                    Log.d(TAG, "=====zhongjihao===send Video Encoder BUFFER_FLAG_END_OF_STREAM====");
                     vEncoder.queueInputBuffer(inputBufferIndex, 0, rotateYuv420.length,
                             pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 } else {
@@ -505,9 +509,9 @@ public class AVEncoder {
 
                 //计算pts，这个值是一定要设置的
                 long pts = new Date().getTime() * 1000 - presentationTimeUs;
-                if (!audioEncoderLoop) {
+                if (aEncoderEnd) {
                     //结束时，发送结束标志，在编码完成后结束
-                    if (DEBUG) Log.d(TAG, "=====zhongjihao======send BUFFER_FLAG_END_OF_STREAM");
+                    Log.d(TAG, "=====zhongjihao===send Audio Encoder BUFFER_FLAG_END_OF_STREAM====");
                     aEncoder.queueInputBuffer(inputBufferIndex, 0, input.length,
                             pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 } else {
@@ -542,6 +546,9 @@ public class AVEncoder {
                 outputBufferIndex = aEncoder.dequeueOutputBuffer(aBufferInfo, 0);
                 //编码结束的标志
                 if ((aBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                    Log.d(TAG, "=====zhongjihao=====Recv Audio Encoder===BUFFER_FLAG_END_OF_STREAM=====" );
+                    audioEncoderLoop = false;
+                    audioEncoderThread.interrupt();
                     return;
                 }
             }
