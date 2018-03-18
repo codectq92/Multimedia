@@ -69,28 +69,9 @@ vhost __defaultVhost__ {
     Android平台Camera采集预览nv21格式数据，AudioRecord采集音频pcm数据，使用MediaCodec分别进行h264和AAC硬编码，通过MediaMuxer合成MP4
 
 
-六、android_librtmp_project工程
-    将AVC(h264)数据推送到流媒体服务器。实现方法是：
-	1先使用android自带的API采集摄像头数据，然后进行h264编码。
-	2、然后使用ndk开发将编码后的数据通过librtmp发送出去
-
-	编译步骤：
-	   安装ndk版本至少是r14
-	   环境变量ANDROID_NDK_ROOT设置到PAHT中
-	   cd jni/rtmpvedio/polarssl-1.2.14/
-	   执行armeabi_or_v7a_build.sh脚本
-	   cd jni/
-	   执行ndk-build
-	运行步骤：
-	   1 将VideoRunnable.java中IP地址192.168.1.103改为srs服务器所在的IP,android客户端ip和srs服务器在同一网络
-	   2 下载srs服务器代码
-	   3 cd srs/trunk
-	   4 bash scripts/build.sh
-	   5 bash scripts/run.sh
-	   6 火狐浏览器打开srs网页客户端 如 http://192.168.1.103:8085
-	   7 在srs网页客户端rtmp地址栏中输入rtmp://192.168.1.103:1935/zhongjihao/myh264
-	   8 最后用AndroidStudio编译运行apk，点击开始即可在srs网页客户端上看到android客户端推送过来的视频
-	   9 bash scripts/stop.sh 结束srs服务器运行
+六、android_librtmp_project工程 
+    使用Camera和AudioRecord采集音视频数据，通过MediaCodec对音视频实施硬编码，通过Rtmp协议发送到流媒体服务器的直播方案
+    
 
 
 
