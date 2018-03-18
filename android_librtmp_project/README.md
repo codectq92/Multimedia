@@ -10,7 +10,7 @@ Android平台上基于LibRtmp库实现的推流直播
    2、使用AudioRecord采集音频数据
    3、使用MediaCodec对视频和音频分别进行硬编码为H264码流和AAC码流
    4、然后使用ndk开发将编码后的数据通过librtmp发送出去
-   
+
 编译步骤：
    安装ndk版本至少是r14
    1 环境变量ANDROID_NDK_ROOT设置到PAHT中
@@ -18,7 +18,7 @@ Android平台上基于LibRtmp库实现的推流直播
      执行armeabi_or_v7a_build.sh脚本
    3 cd jni/
      执行ndk-build
-     
+
 运行步骤：
    1 将MainActivity.java中IP地址192.168.1.101改为srs服务器所在的IP,android客户端ip和srs服务器在同一网络
    2 下载srs服务器代码
