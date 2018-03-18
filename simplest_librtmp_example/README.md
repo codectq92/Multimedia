@@ -1,10 +1,7 @@
-本工程采用git管理，可以通过git log查看提交记录
-
-
 本工程包含了LibRTMP的使用示例，包含如下子工程：
-simplest_librtmp_receive: 接收RTMP流媒体并在本地保存成FLV格式的文件。
-simplest_librtmp_send_flv: 将FLV格式的视音频文件使用RTMP推送至RTMP流媒体服务器。
-simplest_librtmp_send264: 将内存中的H.264数据推送至RTMP流媒体服务器。
+   simplest_librtmp_receive: 接收RTMP流媒体并在本地保存成FLV格式的文件。
+   simplest_librtmp_send_flv: 将FLV格式的视音频文件使用RTMP推送至RTMP流媒体服务器。
+   simplest_librtmp_send264: 将内存中的H.264数据推送至RTMP流媒体服务器。
 
 Ubuntu16.0.4下播放H264裸流文件
    1 在软件中心搜索安装VLC media player播放器
