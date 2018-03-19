@@ -19,17 +19,20 @@ Ubuntu16.0.4下播放网络流视频 \
 
 librtmp库编译步骤 \
    在Ubuntu 16.04 64bit下编译安装rtmpdump并调试输出 \
-   1. cd libRTMP/rtmpdump \
-   2.安装相关依赖类 \
+   1.cd libRTMP/rtmpdump \
+     安装相关依赖类 \
      需要用到的依赖库是zlib, openssl库,使用如下命令安装 \
      sudo apt-get install openssl \
      sudo apt-get install libssl-dev \
      sudo apt-get install zlib1g-dev
-   3.编译 \
-     make
-   4. 设置librtmp库搜索路径 \
-      export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH	  
-   5 在当前目录下 \
+  
+   2.编译 \
+     make \
+   
+   3. 设置librtmp库搜索路径 \
+      export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH \
+
+   4 在当前目录下 \
      make clean \
      make \
      生成3个执行程序，rtmppushflv代表推送flv到rtmp文件，rtmppullflv代表接收rtmp服务器推送来的flv视频，rtmppushh264代表推送h264到rtmp服务器
