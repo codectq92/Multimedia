@@ -28,9 +28,9 @@ librtmp库编译步骤 \
   
    2.编译 \
      make
-   
-   3. 设置librtmp库搜索路径 \
-      export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH \
+
+   3.设置librtmp库搜索路径 \
+    export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH \
 
    4 在当前目录下 \
      make clean \
