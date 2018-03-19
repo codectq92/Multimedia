@@ -1,32 +1,30 @@
 srs流媒体服务器的搭建部署： \
- 第一步，获取SRS。详细参考GIT获取代码 \
-   git clone https://github.com/ossrs/srs cd srs/trunk \
-   或者使用git更新已有代码：\
-   git pull \
+    第一步，获取SRS。详细参考GIT获取代码 \
+    git clone https://github.com/ossrs/srs cd srs/trunk \
+    或者使用git更新已有代码：\
+    git pull
    
    
-第二步，配置SRS \
-   ./configure --prefix=/usr/local/srs --with-ssl --with-hls --with-hds --with-dvr --with-nginx --with-http-callback --with-http-server --with-stream-caster --with-http-api --with-ffmpeg --with-transcode --with-ingest --with-stat --with-librtmp --with-research --with-utest --with-gperf --with-gprof \
+   第二步，配置SRS \
+     ./configure --prefix=/usr/local/srs --with-ssl --with-hls --with-hds --with-dvr --with-nginx --with-http-callback --with-http-server --with-stream-caster --with-http-api --with-ffmpeg --with-transcode --with-ingest --with-stat --with-librtmp --with-research --with-utest --with-gperf --with-gprof
    
-   
-第三步 编译安装 \
-   make \
-   sudo make install \
-   
-第四步，启动SRS。\
-   ./objs/srs -c conf/rtmp.conf
+   第三步 编译安装 \
+     make \
+     sudo make install
+     
+   第四步，启动SRS。\
+     ./objs/srs -c conf/rtmp.conf
 
-第五步，启动推流编码器。\
-  使用FFMPEG命令推流： \
-  for((;;)); do \
-    ./objs/ffmpeg/bin/ffmpeg -re -i ./doc/source.200kbps.768x320.flv \
-    -vcodec copy -acodec copy \
-    -f flv -y rtmp://127.0.0.1/live/livestream; \
-    sleep 1; \
-   done \
-   
-第六步，观看RTMP流 \
-   RTMP流地址为：rtmp://127.0.0.1/live/livestream 可以使用VLC观看。
+   第五步，启动推流编码器。\
+     使用FFMPEG命令推流： \
+       for((;;)); do \
+         ./objs/ffmpeg/bin/ffmpeg -re -i ./doc/source.200kbps.768x320.flv -vcodec copy -acodec copy \
+         -f flv -y rtmp://127.0.0.1/live/livestream; \
+         sleep 1; \
+         done
+         
+   第六步，观看RTMP流 \
+     RTMP流地址为：rtmp://127.0.0.1/live/livestream 可以使用VLC观看。
 
 
 
