@@ -8,9 +8,9 @@
 #ifndef CRTMP_SEND_H264_H
 #define CRTMP_SEND_H264_H
 
-#include "libRTMP/rtmpdump/librtmp/rtmp_sys.h"
-#include "libRTMP/rtmpdump/librtmp/log.h"
-#include "libRTMP/rtmpdump/librtmp/rtmp.h"
+#include "libRTMP/librtmp/rtmp_sys.h"
+#include "libRTMP/librtmp/log.h"
+#include "libRTMP/librtmp/rtmp.h"
 #include "CNetByteOper.h"
 
 //定义包头长度，RTMP_MAX_HEADER_SIZE=18

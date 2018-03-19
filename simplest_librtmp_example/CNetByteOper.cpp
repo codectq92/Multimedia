@@ -5,7 +5,7 @@
     > Created Time: 2018年01月10日 星期三 15时03分54秒
  ************************************************************************/
 
-#include "libRTMP/rtmpdump/librtmp/amf.h"
+#include "libRTMP/librtmp/amf.h"
 #include "CNetByteOper.h"
 
 /*read 1 byte*/

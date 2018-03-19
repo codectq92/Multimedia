@@ -8,8 +8,8 @@
 #ifndef RTMP_RECV_FLV_H
 #define RTMP_RECV_FLV_H
 
-#include "libRTMP/rtmpdump/librtmp/rtmp_sys.h"
-#include "libRTMP/rtmpdump/librtmp/log.h"
+#include "libRTMP/librtmp/rtmp_sys.h"
+#include "libRTMP/librtmp/log.h"
 
 
 #define RD_SUCCESS        0
