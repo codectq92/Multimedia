@@ -1,4 +1,4 @@
-Android平台上基于LibRtmp库实现的推流直播 \
+Android平台上基于LibRtmp库实现的推流直播 
 
 使用到的api \
     音视频采集用到的api有：Camera、AudioRecord \
