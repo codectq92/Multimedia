@@ -1,6 +1,6 @@
 CUR_DIR = $(shell pwd)
 
-LIBDIR = $(CUR_DIR)/libRTMP/rtmpdump/librtmp
+LIBDIR = $(CUR_DIR)/libRTMP/librtmp/
 
 all : rtmppushflv rtmppullflv rtmppushh264
 
