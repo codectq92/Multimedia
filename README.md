@@ -1,18 +1,20 @@
-srs流媒体服务器的搭建部署：
-  第一步，获取SRS。详细参考GIT获取代码
-    git clone https://github.com/ossrs/srs cd srs/trunk 
-    或者使用git更新已有代码：
-    git pull
-  
-  第二步，配置SRS
-  ./configure --prefix=/usr/local/srs --with-ssl --with-hls --with-hds --with-dvr --with-nginx --with-http-callback --with-http-server --with-stream-caster --with-http-api --with-ffmpeg --with-transcode --with-ingest --with-stat --with-librtmp --with-research --with-utest --with-gperf --with-gprof 
-  
- 第三步 编译安装
-    make
-    sudo make install
-
- 第四步，启动SRS。
-    ./objs/srs -c conf/rtmp.conf
+srs流媒体服务器的搭建部署： \
+ 第一步，获取SRS。详细参考GIT获取代码 \
+   git clone https://github.com/ossrs/srs cd srs/trunk \
+   或者使用git更新已有代码：\
+   git pull \
+   \
+   
+第二步，配置SRS \
+   ./configure --prefix=/usr/local/srs --with-ssl --with-hls --with-hds --with-dvr --with-nginx --with-http-callback --with-http-server --with-stream-caster --with-http-api --with-ffmpeg --with-transcode --with-ingest --with-stat --with-librtmp --with-research --with-utest --with-gperf --with-gprof \
+   \
+   
+第三步 编译安装 \
+   make \
+   sudo make install \
+   \
+第四步，启动SRS。\
+   ./objs/srs -c conf/rtmp.conf
 
  第五步，启动推流编码器。
    使用FFMPEG命令推流：
