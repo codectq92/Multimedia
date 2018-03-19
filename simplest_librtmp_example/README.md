@@ -25,13 +25,10 @@ librtmp库编译步骤 \
      sudo apt-get install openssl \
      sudo apt-get install libssl-dev \
      sudo apt-get install zlib1g-dev
-	 
    3.编译 \
      make
-     
    4. 设置librtmp库搜索路径 \
-      export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH
-	  
+      export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH	  
    5 在当前目录下 \
      make clean \
      make \
