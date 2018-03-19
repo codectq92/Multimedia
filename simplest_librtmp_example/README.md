@@ -27,7 +27,7 @@ librtmp库编译步骤 \
      sudo apt-get install zlib1g-dev
   
    2.编译 \
-     make \
+     make
    
    3. 设置librtmp库搜索路径 \
       export LD_LIBRARY_PATH=./libRTMP/rtmpdump/librtmp:$LD_LIBRARY_PATH \
